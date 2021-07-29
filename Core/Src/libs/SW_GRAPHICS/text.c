@@ -360,6 +360,7 @@ static void graphic_puts_float_RAM( volatile T_DISPLAY *buffer, T_STRING *string
 	memset(buff_wchar, 0, 4*20);
 	ftoa( data, buff, 4 );
 
+
 	(void)graphic_char_to_wide( buff_wchar, buff );
     string->stringLength = graphic_puts_RAM( buffer, string, textSize, color, bg, gamma );
 }
