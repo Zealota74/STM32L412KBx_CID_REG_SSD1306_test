@@ -66,11 +66,11 @@ int main(void) {
 	struct Vector rawGyro;
 	struct Vector normGyro;
 	while(1) {
-		SW_VCNL4010_MEASURE_EVENT();
-		PAJ7620_EVENT();
+//		SW_VCNL4010_MEASURE_EVENT();
+//		PAJ7620_EVENT();
 
 		if (softTimer2 == 0) {
-			softTimer2 = 200;
+			softTimer2 = 500;
 			sw_led_xor();
 //			rawGyro		= MPU6050__readRawGyro();
 //			normGyro	= MPU6050__readNormalizeGyro();
