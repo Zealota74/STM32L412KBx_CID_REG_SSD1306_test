@@ -1,20 +1,11 @@
 #include "sw_mcu_conf.h"
 
-#include <stddef.h>
-#include <string.h>
-
 #include "libs/sw_rcc.h"
 
 #include "libs/SW_BOARD/sw_gpio.h"
 #include "libs/SW_BOARD/sw_led_blink_debug.h"
 #include "libs/SW_TIMERS/sw_soft_timers.h"
 #include "libs/sw_i2c_simple_v2.h"
-
-//#include "libs/MK_GLCD/mk_glcd_base.h"
-
-//#include "libs/SW_SSD1306/sw_ssd1306.h"
-//#include "libs/SW_SSD1306/graphic.h"
-
 
 #include "libs/SW_GRAPHICS/SW_SSD1306/framebuffer.h"
 #include "libs/SW_GRAPHICS/displays.h"
@@ -29,8 +20,6 @@
 
 
 void SystemClock_Config(void);
-void mk_glcd_test(void);
-void i2c_test(void);
 
 void pomiar( T_RESULTS *results );
 uint16_t proximityAverage;
@@ -40,33 +29,18 @@ void my_gesture( TGSNR last_gs, TGSNR second_gs, TGSNR first_gs );
 FONT_INFO CurrentFont;
 
 int main(void) {
-
-
 	SystemClock_Config();
-
 	RCC_gpio_init();
 	sw_led_debug_init();
 	sw_softTimers_init( 1, MICRO_SEC );
+
 	delay_ms(100);
 	sw_i2c_simple_init();
-
-//	can_display = 1;
-//	setCurrentFont( &RockwellCondensed14x32 );
-//	glcd_init();
-
 	sw_ssd1306_init();
 
-//	test_text_param( (FONT_INFO *)&Arial6ptFontInfo_var );
-//	test_text_display_number( 100 );
-
-	TEXT_display_number( 0, 0, 100 );
-	TEXT_display_string( 0, 32, L"Napis kurwa" );
-
 	MPU6050__init( MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G );
-// Kalibracja żyroskopu
-	MPU6050__calibrateGyro( 5 );
-// Ustawienie czułości
-	MPU6050__setThreshold( 3 );
+	MPU6050__setThreshold( 3 );		// Ustawienie czułości
+	MPU6050__calibrateGyro( 5 );	// Kalibracja żyroskopu
 
 	delay_ms(10);
 
@@ -84,6 +58,9 @@ int main(void) {
 	paj7620_init( fps_120 );
     register_gesture_callback( my_gesture, NULL );
 
+    T_STRING TextX;
+    T_STRING TextY;
+    T_STRING TextZ;
 
 	softTimer3 = 500;
 	struct Vector rawGyro;
@@ -93,24 +70,22 @@ int main(void) {
 		PAJ7620_EVENT();
 
 		if (softTimer2 == 0) {
-			softTimer2 = 500;
+			softTimer2 = 200;
 			sw_led_xor();
-			rawGyro		= MPU6050__readRawGyro();
-			normGyro	= MPU6050__readNormalizeGyro();
-			TEXT_display_float( 0, 0, normGyro.YAxis );
+//			rawGyro		= MPU6050__readRawGyro();
+//			normGyro	= MPU6050__readNormalizeGyro();
+			normGyro	= MPU6050__readNormalizeAccel();
+			TEXT_display_float( 0, 0,  normGyro.XAxis, &TextX );
+			TEXT_display_float( 0, 16, normGyro.YAxis, &TextY );
+			TEXT_display_float( 0, 32, normGyro.ZAxis, &TextZ );
 
 		}
 
-
 		if ( !softTimer3 ) {
-//			sw_ssd1306_ram_to_display(0);					// Ładujemy do sterownika
-//			mk_ssd1306_display();
 			sw_ssd1306_display();
 			softTimer3 = 300;
 		}
-
 	}
-
 }
 
 

@@ -52,8 +52,8 @@ void test_text_param( FONT_INFO * font );
 void test_text_display_number( uint8_t number );
 /********************************************/
 
-void TEXT_display_number( int16_t x, int16_t y, int16_t number );
-void TEXT_display_string( int16_t x, int16_t y, wchar_t *  str );
-void TEXT_display_float( int16_t x, int16_t y, float number );
+void TEXT_display_number( int16_t x, int16_t y, int16_t number, T_STRING * Text );
+void TEXT_display_string( int16_t x, int16_t y, wchar_t *  str, T_STRING * Text );
+void TEXT_display_float( int16_t x, int16_t y, float number, 	T_STRING * Text );
 
 #endif /* LIBS_SW_GRAPHICS_TEXT_H_ */

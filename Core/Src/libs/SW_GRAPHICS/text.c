@@ -302,97 +302,77 @@ void rtc_puts_int_RAM( volatile T_DISPLAY *buffer, T_STRING *string, int data, u
 	string->stringLength = graphic_puts_RAM( buffer, string, textSize, color, bg, gamma );
 }
 
-
-// Reverses a string 'str' of length 'len'
-static void reverse( char *str, int len ) {
-	int i = 0, j = len - 1, temp;
-	while (i < j) {
-		temp = str[i];
-		str[i] = str[j];
-		str[j] = temp;
-		i++;
-		j--;
-	}
-}
-
-// Converts a given integer x to string str[].
-// d is the number of digits required in the output.
-// If d is more than the number of digits in x,
-// then 0s are added at the beginning.
-static int intToStr( int x, char str[], int d) {
-	int i = 0;
-	while (x) {
-		str[i++] = (x % 10) + '0';
-		x = x / 10;
-	}
-	// If number of digits required is more, then
-	// add 0s at the beginning
-	while (i < d)
-		str[i++] = '0';
-
-	reverse(str, i);
-	str[i] = '\0';
-	return i;
-}
-
-// Converts a floating-point/double number to a string.
-static void ftoa( float n, char *res, int afterpoint ) {
-	int ipart 	= (int) n;						// Extract integer part
-	float fpart = n - (float) ipart;			// Extract floating part
-	int i 		= intToStr( ipart, res, 0 );	// convert integer part to string
-
-	if (afterpoint != 0) {						// check for display option after point
-		res[i] = '.'; 							// add dot
-	// Get the value of fraction part upto given no.
-	// of points after dot. The third parameter
-	// is needed to handle cases like 233.007
-		fpart = fpart * pow( 10, afterpoint );
-
-		intToStr((int) fpart, res + i + 1, afterpoint);
-	}
-}
+#define SHIFT_MINUS		1
+#define FLOAT_PRECISION	10
 static void graphic_puts_float_RAM( volatile T_DISPLAY *buffer, T_STRING *string, float data, uint8_t textSize,
 							 	 	 uint32_t color, uint32_t bg, const T_GAMMA *gamma ) {
-	wchar_t	buff_wchar[20];
-	char	buff[20];
-	string->str = buff_wchar;
-	memset(buff, 0, 20);
-	memset(buff_wchar, 0, 4*20);
-	ftoa( data, buff, 4 );
+	char text_char [16];
+	char *ptr_char = text_char;
 
+	wchar_t	text_wchar[16];
+	string->str = text_wchar;
 
-	(void)graphic_char_to_wide( buff_wchar, buff );
+	uint8_t i = SHIFT_MINUS;
+	uint8_t j = 0;
+
+	if ( data < 0 ) *text_char = '-';
+	else			*text_char = ' ';					// Space for empty character
+
+	if (data < 0) data = data * -1;
+
+	int32_t dec = (int32_t)data;
+	itoa( dec, text_char + SHIFT_MINUS, 10 );			// One place for minus
+
+	while ( *( ptr_char++ ) ) {
+		i++;
+		j++;
+	}
+	text_char[ i++ - 1 ] = '.';
+
+	data = data - (float32_t)dec;
+	do {
+		data = (float32_t)data*10;
+		dec = (uint32_t) ( data );
+		text_char[ i++ - SHIFT_MINUS ] = '0';
+		j++;
+	} while ( dec == 0 );
+	if (j>10) j = 10;
+
+	dec = (uint32_t )powf( 10, FLOAT_PRECISION - j )*data;   // 10000000 * data
+
+	itoa( (uint32_t)dec, text_char + i - SHIFT_MINUS, 10 );
+
+	(void)graphic_char_to_wide( text_wchar, text_char );
     string->stringLength = graphic_puts_RAM( buffer, string, textSize, color, bg, gamma );
 }
 
 
-
-
-void TEXT_display_number( int16_t x, int16_t y, int16_t number ) {
-	static T_STRING Text;
-	Text.str = L"";
-	Text.x = x;
-	Text.y = y;
-	Text.onChange = 1;
-	Text.fontPtrPGM = (FONT_INFO *)&MicrosoftSansSerif8ptFontInfo_var;
-	graphic_puts_int_RAM( TextBuffer, &Text, number, FONTx1, (uint32_t)WhiteColor, (uint32_t)BlackColor, &GammaRGB );
+void TEXT_display_number( int16_t x, int16_t y, int16_t number, T_STRING * Text ) {
+	wchar_t String[10];
+	Text->str = String;
+	Text->x = x;
+	Text->y = y;
+	Text->onChange = 1;
+	Text->fontPtrPGM = (FONT_INFO *)&MicrosoftSansSerif8ptFontInfo_var;
+	graphic_puts_int_RAM( TextBuffer, Text, number, FONTx1, (uint32_t)WhiteColor, (uint32_t)BlackColor, &GammaRGB );
 }
-void TEXT_display_float( int16_t x, int16_t y, float number ) {
-	static T_STRING Text;
-	Text.str = L"";
-	Text.x = x;
-	Text.y = y;
-	Text.onChange = 1;
-	Text.fontPtrPGM = (FONT_INFO *)&MicrosoftSansSerif8ptFontInfo_var;
-	graphic_puts_float_RAM( TextBuffer, &Text, number, FONTx1, (uint32_t)WhiteColor, (uint32_t)BlackColor, &GammaRGB );
+void TEXT_display_float( int16_t x, int16_t y, float number, T_STRING * Text ) {
+	wchar_t String[10];
+	Text->str = String;
+	Text->x = x;
+	Text->y = y;
+	Text->onChange = 1;
+	Text->fontPtrPGM = (FONT_INFO *)&MicrosoftSansSerif8ptFontInfo_var;
+	graphic_puts_float_RAM( TextBuffer, Text, number, FONTx1, (uint32_t)WhiteColor, (uint32_t)BlackColor, &GammaRGB );
 }
-void TEXT_display_string( int16_t x, int16_t y, wchar_t * str ) {
-	static T_STRING Text;
-	Text.x = x;
-	Text.y = y;
-	Text.str = str;
-	Text.fontPtrPGM = (FONT_INFO *)&MicrosoftSansSerif8ptFontInfo_var ;
-	graphic_puts_RAM( TextBuffer, &Text, FONTx1, (uint32_t)WhiteColor, (uint32_t)BlackColor, &GammaRGB );
+void TEXT_display_string( int16_t x, int16_t y, wchar_t * str, T_STRING * Text ) {
+	wchar_t String[10];
+	Text->str = String;
+	Text->x = x;
+	Text->y = y;
+	Text->str = str;
+	Text->fontPtrPGM = (FONT_INFO *)&MicrosoftSansSerif8ptFontInfo_var ;
+	graphic_puts_RAM( TextBuffer, Text, FONTx1, (uint32_t)WhiteColor, (uint32_t)BlackColor, &GammaRGB );
 }
 
 

@@ -416,7 +416,7 @@ struct Activites MPU6050__readActivites(void) {
 	return a;
 }
 
-struct Vector MPU6050__MPU6050__readRawAccel(void) {
+struct Vector MPU6050__readRawAccel(void) {
 	uint8_t buffer[6];
 	sw_i2c_read_block( MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOUT_H, 6, buffer );
 
