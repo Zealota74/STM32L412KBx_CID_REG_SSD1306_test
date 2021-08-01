@@ -14,56 +14,85 @@
 
 
 
-static inline void sw_i2c_autoend_on(void)  { hI2Cx->I2C->CR2 |=  I2C_CR2_AUTOEND; }
-static inline void sw_i2c_autoend_off(void) { hI2Cx->I2C->CR2 &= ~I2C_CR2_AUTOEND; }
+static INLINE void sw_i2c_autoend_on(void)  { hI2Cx->I2C->CR2 |=  I2C_CR2_AUTOEND; }
+static INLINE void sw_i2c_autoend_off(void) { hI2Cx->I2C->CR2 &= ~I2C_CR2_AUTOEND; }
 static INLINE void sw_i2c_nBytes( uint8_t nBytes ) {
 	MODIFY_REG( I2C1->CR2, I2C_CR2_NBYTES, nBytes << I2C_CR2_NBYTES_Pos );
 }
 static INLINE void sw_i2c_read_dir (void) { hI2Cx->I2C->CR2 |= I2C_CR2_RD_WRN; }
 static INLINE void sw_i2c_write_dir(void) { hI2Cx->I2C->CR2 &= ~I2C_CR2_RD_WRN; }
 
-static void sw_i2c_write_buff( uint16_t nBytes, const uint8_t * pBuff ) {
-	for ( uint16_t i=0; i< nBytes; i++ ) {
-		while( sw_is_TXIS_flag_ready() == false) {}
-		sw_i2c_write( *pBuff++ );
-	}
+static INLINE I2CSTATUS sw_i2c_isTXIS_error(void) {
+	whileTimer = 2;
+	while( sw_is_TXIS_flag_ready() == false ) {
+		if ( whileTimer == 0 && sw_is_NACK_flag_ready() ) {
+			return I2C_Nack;
+		}
+	}	// All bytes send nBytes = 1
+	return I2C_Ok;
 }
-static void sw_i2c_read_buff( uint16_t nBytes, uint8_t * pBuff ) {
-	for ( uint16_t i=0; i< nBytes; i++ ) {
-		while( sw_is_RXNE_flag_ready() == false) {}
-		*pBuff++ = sw_i2c_read(DUMMY);
-	}
+static INLINE I2CSTATUS sw_i2c_isTC_error(void) {
+	whileTimer = 2;
+	while( sw_is_TC_flag_ready() == false ) {
+		if ( whileTimer == 0 && sw_is_NACK_flag_ready() ) {
+			return I2C_Nack;
+		}
+	}	// All bytes send nBytes = 1
+	return I2C_Ok;
 }
 
+static I2CSTATUS sw_i2c_write_buff( uint16_t nBytes, const uint8_t * pBuff ) {
+	for ( uint16_t i=0; i< nBytes; i++ ) {
+		if ( sw_i2c_isTXIS_error() != I2C_Ok ) return I2C_Error;
+		sw_i2c_write( *pBuff++ );
+	}
+	return I2C_Ok;
+}
+static I2CSTATUS sw_i2c_read_buff( uint16_t nBytes, uint8_t * pBuff ) {
+	for ( uint16_t i=0; i< nBytes; i++ ) {
+		while( sw_is_RXNE_flag_ready() == false ) {}
+		*pBuff++ = sw_i2c_read( DUMMY );
+	}
+	return I2C_Ok;
+}
+
+
+/*********************************** Write 1 byte ********************************/
 I2CSTATUS sw_i2c_write_byte( uint8_t byte ) {
 	sw_i2c_write_dir();
 	sw_i2c_autoend_off();
 
 	sw_i2c_nBytes(1);
 	sw_i2c_start();
-	while( sw_is_TXIS_flag_ready() == false ) {}	// All bytes send nBytes = 1
-	sw_i2c_write( byte );
-	while( sw_is_TC_flag_ready() == false ) {}		// All bytes send nBytes = 1
-	sw_i2c_stop();
+	if ( sw_i2c_isTXIS_error() != I2C_Ok ) return I2C_Error;
 
+	sw_i2c_write( byte );
+	whileTimer = 2;
+	if ( sw_i2c_isTC_error() != I2C_Ok ) return I2C_Error;
+
+	sw_i2c_stop();
 	return I2C_Ok;
 }
-uint8_t sw_i2c_read_byte(void) {
-	uint8_t byte;
+/********************************************************************************/
+/*********************************** Read 1 byte ********************************/
+I2CSTATUS sw_i2c_read_byte( uint8_t * byte ) {
 	sw_i2c_read_dir();
 	sw_i2c_autoend_off();
 
 	sw_i2c_nBytes(1);
 	sw_i2c_start();
 	while( sw_is_RXNE_flag_ready() == false ) {}
-	byte = sw_i2c_read(DUMMY);
-	while( sw_is_TC_flag_ready() == false ) {}
-	sw_i2c_stop();
 
-	return byte;
+	*byte = sw_i2c_read(DUMMY);
+	if ( sw_i2c_isTC_error() != I2C_Ok ) return I2C_Error;
+
+	sw_i2c_stop();
+	return I2C_Ok;
 }
-I2CSTATUS sw_i2c_read_block( uint8_t  devAddr, uint8_t regAddr,
-						uint16_t nBytes,  uint8_t * pBuff ) {
+/********************************************************************************/
+
+I2CSTATUS sw_i2c_read_bulk( uint8_t  devAddr, uint8_t regAddr,
+							uint16_t nBytes,  uint8_t * pBuff ) {
 	sw_i2c_set_7bitAddr( devAddr );
 	sw_i2c_write_byte( regAddr );
 	sw_i2c_read_dir();
@@ -95,14 +124,14 @@ I2CSTATUS sw_i2c_read_block( uint8_t  devAddr, uint8_t regAddr,
 				sw_i2c_nBytes( I2C_CR2_NBYTE_MAX );
 		} else {
 			sw_i2c_read_buff( nBytes, (uint8_t *)pBuff +  nBlock*I2C_CR2_NBYTE_MAX );
-			nBytes = 0;									// End of while() loop
+			nBytes = 0;											// End of while() loop
 		}
 	}
 	sw_i2c_stop();
 	return I2C_Ok;
 }
-I2CSTATUS sw_i2c_write_block( uint8_t devAddr, uint8_t regAddr,
-						 uint16_t nBytes, const uint8_t * pBuff ) {
+I2CSTATUS sw_i2c_write_bulk( uint8_t devAddr, uint8_t regAddr,
+						 	  uint16_t nBytes, const uint8_t * pBuff ) {
 	hI2Cx->I2C->CR2 = 0; hI2Cx->I2C->ICR = 0xffffffff;
 	sw_i2c_set_7bitAddr( devAddr );
 	sw_i2c_autoend_off();
@@ -118,9 +147,10 @@ I2CSTATUS sw_i2c_write_block( uint8_t devAddr, uint8_t regAddr,
 	}
 
 	sw_i2c_start();
-	while ( sw_is_TXIS_flag_ready() == false ) {}
+	if ( sw_i2c_isTXIS_error() != I2C_Ok) return I2C_Error;
+
 	sw_i2c_write( regAddr ); 							// First byte, address
-	while ( sw_is_TXIS_flag_ready() == false ) {}
+	if ( sw_i2c_isTXIS_error() != I2C_Ok) return I2C_Error;
 
 	uint16_t nBlock = 0;
 	uint16_t n 		= I2C_CR2_NBYTE_MAX - 1;			//
@@ -156,39 +186,44 @@ I2CSTATUS sw_i2c_write_block( uint8_t devAddr, uint8_t regAddr,
 
 
 I2CSTATUS sw_i2c_write_reg( uint8_t devAddr, uint8_t reg, uint8_t data ) {
-//	hI2Cx->I2C->CR2 = 0; hI2Cx->I2C->ICR = 0xffffffff;
 	sw_i2c_set_7bitAddr( devAddr );
 	sw_i2c_write_dir();
 	sw_i2c_autoend_off();
 
 	sw_i2c_nBytes(2);
-	sw_i2c_start(); 		while ( sw_is_TXIS_flag_ready() == false ) {}
-	sw_i2c_write( reg ); 	while ( sw_is_TXIS_flag_ready() == false );
-	sw_i2c_write( data ); 	while ( sw_is_TC_flag_ready() 	== false );
+	sw_i2c_start();
+	if ( sw_i2c_isTXIS_error() != I2C_Ok ) return I2C_Error;
+
+	sw_i2c_write( reg );
+	if ( sw_i2c_isTXIS_error() != I2C_Ok ) return I2C_Error;
+
+	sw_i2c_write( data );
+	if ( sw_i2c_isTC_error() != I2C_Ok ) return I2C_Error;
 	sw_i2c_stop();
+
 	return I2C_Ok;
 }
 
 
 I2CSTATUS sw_i2c_read_reg( uint8_t devAddr, uint8_t reg, uint8_t * data ) {
-	I2CSTATUS status = I2C_Ok;
-
 	sw_i2c_set_7bitAddr( devAddr );
 	sw_i2c_write_dir();
 	sw_i2c_autoend_off();
 	sw_i2c_nBytes(1);
-	status = sw_i2c_start();
-	while ( sw_is_TXIS_flag_ready() == false );
-	sw_i2c_write( reg ); 	while ( sw_is_TC_flag_ready() 	== false );
+	sw_i2c_start();
+	if ( sw_i2c_isTXIS_error() != I2C_Ok) return I2C_Error;
+
+	sw_i2c_write( reg );	while ( sw_is_TC_flag_ready() 	== false );
 
 	sw_i2c_read_dir();
 	sw_i2c_nBytes(1);
 	sw_i2c_start();			while ( sw_is_RXNE_flag_ready() == false );
 
-	*data = sw_i2c_read(DUMMY);	while ( sw_is_TC_flag_ready()	== false );
+	*data = sw_i2c_read(DUMMY);
+	if ( sw_i2c_isTC_error() != I2C_Ok ) return I2C_Error;
 	sw_i2c_stop();
 
-	return status;
+	return I2C_Ok;;
 }
 
 void sw_i2c_simple_init(void) {
@@ -210,23 +245,36 @@ void sw_i2c_simple_init(void) {
 	gpio_pin_HI ( hI2Cx->scl_port,  hI2Cx->scl_pin );
 	gpio_pin_HI ( hI2Cx->sda_port,  hI2Cx->sda_pin );
 
-	hI2Cx->I2C->TIMINGR  = (uint32_t)I2C_TIMING_80MHz_100KHz;
+	hI2Cx->I2C->TIMINGR  = (uint32_t)I2C_TIMING_80MHz_400KHz;
 	SET_BIT( hI2Cx->I2C->CR1, I2C_CR1_PE );
 }
 
-I2CSTATUS sw_i2c_IsDeviceReady( uint8_t devAddr, uint32_t trials, uint16_t delay ) {
+I2CSTATUS sw_i2c_IsDeviceReady( uint8_t devAddr, uint32_t trials, uint16_t delayMS ) {
 	sw_i2c_set_7bitAddr( devAddr );
 	while (trials--) {
 		sw_i2c_start();
 		sw_i2c_stop();
-		delay_ms( delay );
+		delay_ms( delayMS );
 	}
 	if ( hI2Cx->I2C->ISR & I2C_ISR_NACKF ) {
-		return I2C_Error;
+		return I2C_Nack;
 	}
 	return I2C_Ok;
 }
 
+I2CSTATUS sw_i2c_slave_test( uint8_t devAddr ) {
+	I2CSTATUS i2cstatus = I2C_Ok;
+	sw_i2c_set_7bitAddr( devAddr );
+
+	sw_i2c_autoend_off();
+	sw_i2c_write_dir();
+	if ( sw_i2c_start() == I2C_Ok )
+		i2cstatus = I2C_Ok;
+	else
+		i2cstatus = I2C_Error;
+
+	return i2cstatus;
+}
 
 
 #ifdef I2C_TEST

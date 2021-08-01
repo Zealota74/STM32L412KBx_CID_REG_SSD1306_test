@@ -14,6 +14,7 @@
 
 #include "libs/MK_GESTURE_PAJ7620/mk_paj7620.h"
 #include "libs/sw_mpu6050.h"
+#include "libs/VL53L0X.h"
 
 
 #include "libs/sw_vcnl4010.h"
@@ -25,6 +26,14 @@ void pomiar( T_RESULTS *results );
 uint16_t proximityAverage;
 uint16_t ambilightAverage;
 void my_gesture( TGSNR last_gs, TGSNR second_gs, TGSNR first_gs );
+
+void mpu6050_test_loop(void);
+void mpu6050_test_init(void);
+
+T_STRING TextX;
+T_STRING TextY;
+T_STRING TextZ;
+T_STRING Temp;
 
 FONT_INFO CurrentFont;
 
@@ -38,9 +47,12 @@ int main(void) {
 	sw_i2c_simple_init();
 	sw_ssd1306_init();
 
-	MPU6050__init( MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G );
-	MPU6050__setThreshold( 3 );		// Ustawienie czułości
-	MPU6050__calibrateGyro( 5 );	// Kalibracja żyroskopu
+//	mpu6050_test_init();
+
+//	I2CSTATUS status = sw_i2c_IsDeviceReady( ADDRESS_DEFAULT << 1, 3, 3 );
+//	sw_i2c_slave_test( ADDRESS_DEFAULT << 1 );
+	VL53L0X__setup();
+
 
 	delay_ms(10);
 
@@ -58,13 +70,10 @@ int main(void) {
 	paj7620_init( fps_120 );
     register_gesture_callback( my_gesture, NULL );
 
-    T_STRING TextX;
-    T_STRING TextY;
-    T_STRING TextZ;
 
 	softTimer3 = 500;
-	struct Vector rawGyro;
-	struct Vector normGyro;
+
+
 	while(1) {
 //		SW_VCNL4010_MEASURE_EVENT();
 //		PAJ7620_EVENT();
@@ -72,13 +81,8 @@ int main(void) {
 		if (softTimer2 == 0) {
 			softTimer2 = 500;
 			sw_led_xor();
-//			rawGyro		= MPU6050__readRawGyro();
-//			normGyro	= MPU6050__readNormalizeGyro();
-			normGyro	= MPU6050__readNormalizeAccel();
-			TEXT_display_float( 0, 0,  normGyro.XAxis, &TextX );
-			TEXT_display_float( 0, 16, normGyro.YAxis, &TextY );
-			TEXT_display_float( 0, 32, normGyro.ZAxis, &TextZ );
 
+			VL53L0X__loop();
 		}
 
 		if ( !softTimer3 ) {
@@ -88,7 +92,43 @@ int main(void) {
 	}
 }
 
+void mpu6050_test_init(void) {
+	MPU6050__init( MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G );
+	MPU6050__calibrateGyro( 5 );	// Kalibracja żyroskopu
+	MPU6050__setThreshold( 3 );		// Ustawienie czułości
+}
+void mpu6050_test_loop(void) {
+	// Pitch, Roll and Yaw values
+	float pitch = 0;
+	float roll  = 0;
+	float yaw   = 0;
+//	struct Vector rawGyro;
+	struct Vector normGyro;
 
+	static unsigned long 	timer 	 = 0;
+	float 					timeStep = 0.01;
+
+//	rawGyro		= MPU6050__readRawGyro();
+//	rawGyro		= MPU6050__readRawAccel();
+	normGyro	= MPU6050__readNormalizeGyro();
+//	normGyro	= MPU6050__readNormalizeAccel();
+//	TEXT_display_float( 0, 0,  normGyro.XAxis, &TextX );
+//	TEXT_display_float( 0, 16, normGyro.YAxis, &TextY );
+//	TEXT_display_float( 0, 32, normGyro.ZAxis, &TextZ );
+	timer = millis();
+
+	// Calculate Pitch, Roll and Yaw
+	pitch 	= pitch + normGyro.YAxis * timeStep;
+	roll 	= roll  + normGyro.XAxis * timeStep;
+	yaw 	= yaw   + normGyro.ZAxis * timeStep;
+	TEXT_display_float( 0, 0,  pitch,	&TextX );
+	TEXT_display_float( 0, 16, roll,	&TextY );
+	TEXT_display_float( 0, 32, yaw,		&TextZ );
+	delay_ms( (timeStep*1000) - (millis() - timer));
+
+	float temp = MPU6050__readTemperature();
+	TEXT_display_float( 0, 48, temp, &Temp );
+}
 
 // ------------ Definicje funkcji --------------
 static uint16_t srednia1( uint16_t wartosc ) {

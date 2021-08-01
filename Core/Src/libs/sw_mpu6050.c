@@ -51,7 +51,7 @@ static int16_t	MPU6050__readRegister16( uint8_t reg ) {
 	int16_t value = 0;
 
 	uint8_t buff[2];
-	sw_i2c_read_block( MPU6050_ADDRESS, reg, 2, buff );
+	sw_i2c_read_bulk( MPU6050_ADDRESS, reg, 2, buff );
 	uint8_t vha = buff[0];
 	uint8_t vla = buff[1];
 	value = vha << 8 | vla;
@@ -60,7 +60,7 @@ static int16_t	MPU6050__readRegister16( uint8_t reg ) {
 
 static void		MPU6050__writeRegister16( uint8_t reg, int16_t value ) {
 	uint8_t buff[2] = { ((uint8_t)value >> 8), (uint8_t)value };
-	sw_i2c_write_block( MPU6050_ADDRESS, reg, 2, buff );
+	sw_i2c_write_bulk( MPU6050_ADDRESS, reg, 2, buff );
 }
 // Read register bit
 static bool		MPU6050__readRegisterBit( uint8_t reg, uint8_t pos ) {
@@ -418,7 +418,7 @@ struct Activites MPU6050__readActivites(void) {
 
 struct Vector MPU6050__readRawAccel(void) {
 	uint8_t buffer[6];
-	sw_i2c_read_block( MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOUT_H, 6, buffer );
+	sw_i2c_read_bulk( MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOUT_H, 6, buffer );
 
 	uint8_t xha = buffer[0];
 	uint8_t xla = buffer[1];
@@ -456,7 +456,7 @@ struct Vector MPU6050__readScaledAccel(void) {
 
 struct Vector MPU6050__readRawGyro(void) {
 	uint8_t buff[6];
-	sw_i2c_read_block( MPU6050_ADDRESS, MPU6050_REG_GYRO_XOUT_H, 6, buff );
+	sw_i2c_read_bulk( MPU6050_ADDRESS, MPU6050_REG_GYRO_XOUT_H, 6, buff );
 	uint8_t xha = buff[0];
 	uint8_t xla = buff[1];
 	uint8_t yha = buff[2];

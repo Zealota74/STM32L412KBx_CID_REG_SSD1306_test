@@ -15,24 +15,24 @@
 
 
 static void sw_hardware_TWI_write_buf(uint8_t devAddr, uint8_t reg, uint16_t nBytes, uint8_t *pBuff ) {
-	sw_i2c_write_block( devAddr, reg, nBytes, pBuff );
-	delay_us(100);
+	sw_i2c_write_bulk( devAddr, reg, nBytes, pBuff );
+	delay_us(20);
 };
 static void sw_hardware_TWI_read_buf( uint8_t devAddr, uint8_t reg, uint16_t nBytes, uint8_t *pBuff ) {
-	sw_i2c_read_block ( devAddr, reg, nBytes, pBuff  );
-	delay_us(100);
+	sw_i2c_read_bulk ( devAddr, reg, nBytes, pBuff  );
+	delay_us(20);
 }
 
 static void vcnl4010_write_reg( uint8_t devReg, uint8_t data ) {
 	sw_i2c_write_reg( VCNL4010_I2C_ADDR, devReg, data );
-	delay_us(100);
+	delay_us(20);
 }
 static void vcnl4010_read_reg( uint8_t devReg, uint8_t *data ) {
 	sw_i2c_read_reg( VCNL4010_I2C_ADDR, devReg, data );
-	delay_us(100);
+	delay_us(20);
 }
 
-volatile static uint8_t measure_ready_flag 		= 0;
+//volatile static uint8_t measure_ready_flag 		= 0;
 volatile static uint8_t measureDataReadyFlag	= 0;
 
 static T_RESULTS results;				// Kontener na pomiary

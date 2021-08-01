@@ -173,6 +173,7 @@ static void paj7620_write_reg( uint8_t addr, uint8_t cmd ) {
 	i2c_stop();
 #elif defined STM32F3 || defined STM32L4
 	sw_i2c_write_reg( PAJ7620_ADDR, addr, cmd );
+	delay_us(100);
 #endif
 }
 
@@ -186,7 +187,8 @@ static uint8_t paj7620_read_reg( uint8_t addr, uint8_t len, uint8_t * buf ) {
 	while (len--) *buf++ = i2c_read( len ? ACK : NACK );
 	i2c_stop();
 #elif defined STM32F3 || defined STM32L4
-	sw_i2c_read_block( PAJ7620_ADDR, addr, len, buf );
+	sw_i2c_read_bulk( PAJ7620_ADDR, addr, len, buf );
+	delay_us(100);
 #endif
 
 	return 0;

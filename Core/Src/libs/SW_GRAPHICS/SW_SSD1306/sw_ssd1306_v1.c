@@ -71,7 +71,7 @@ static void WriteCmd( uint8_t cmd ) {
 #elif (TRANSMISSION_MODE==SOFT_I2C) || (TRANSMISSION_MODE==HARD_I2C)
 	sw_i2c_write_reg( I2C_ADDRESS, I2C_CTRL_DC_0, cmd );
 #endif
-	delay_us(100);
+	delay_us(20);
 }
 //***********************************************
 // Zapisanie danej do pamięci obrazu sterownika SSD1306
@@ -87,7 +87,7 @@ static void WriteData( uint8_t regAddr, uint8_t * buffer, uint16_t cnt ) {
 	CS_HI;
 #endif
 #ifdef SSD1306_I2C
-	sw_i2c_write_block( SSD1306_ADDR, SSD1306_SETSTARTLINE, cnt, buffer );
+	sw_i2c_write_bulk( SSD1306_ADDR, SSD1306_SETSTARTLINE, cnt, buffer );
 #endif
 }
 
@@ -124,6 +124,7 @@ void sw_ssd1306_display( void ) {
 #endif
 //	delay_ms(100);
    	WriteData( SSD1306_SETSTARTLINE, (uint8_t *)ActualDMABuffer, FRAMEBUFFER_ALL );
+	delay_us(20);
 }
 /***************************************************************/
 

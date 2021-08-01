@@ -302,45 +302,41 @@ void rtc_puts_int_RAM( volatile T_DISPLAY *buffer, T_STRING *string, int data, u
 	string->stringLength = graphic_puts_RAM( buffer, string, textSize, color, bg, gamma );
 }
 
-#define SHIFT_MINUS		1
 #define FLOAT_PRECISION	10
 static void graphic_puts_float_RAM( volatile T_DISPLAY *buffer, T_STRING *string, float data, uint8_t textSize,
 							 	 	 uint32_t color, uint32_t bg, const T_GAMMA *gamma ) {
-	char text_char [16];
-	char *ptr_char = text_char;
+	char 	text_char [ FLOAT_PRECISION + 3 ];	// Sign, dot and '\0'
+	wchar_t	text_wchar[ FLOAT_PRECISION + 3 ];
+	char *ptr_char 	= text_char;
+	string->str 	= text_wchar;
+	uint32_t dec;
 
-	wchar_t	text_wchar[16];
-	string->str = text_wchar;
-
-	uint8_t i = SHIFT_MINUS;
-	uint8_t j = 0;
-
-	if ( data < 0 ) *text_char = '-';
-	else			*text_char = ' ';					// Space for empty character
-
-	if (data < 0) data = data * -1;
-
-	int32_t dec = (int32_t)data;
-	itoa( dec, text_char + SHIFT_MINUS, 10 );			// One place for minus
-
-	while ( *( ptr_char++ ) ) {
-		i++;
-		j++;
+	if ( data < 0 ) {
+		*text_char = '-';
+		data = data * -1;					// Only number module
+	} else {
+		*text_char = '+';					// Space for sign character
 	}
-	text_char[ i++ - 1 ] = '.';
+	dec 		= (uint32_t)data;			// Integer part of a number;
+	uint8_t i 	= 1;						// First character is sign
+	itoa( dec, text_char + i , 10 );
 
-	data = data - (float32_t)dec;
-	do {
+	while ( *ptr_char ) {					// Find number of integer digits
+		i++;
+		ptr_char++;
+	} i--;
+	text_char[ i++ ] = '.';					// Place '.' character';
+	data = data - (float32_t)dec;			// Fractional part of a number
+
+	do {									// Find first zeros after the dot
 		data = (float32_t)data*10;
-		dec = (uint32_t) ( data );
-		text_char[ i++ - SHIFT_MINUS ] = '0';
-		j++;
-	} while ( dec == 0 );
-	if (j>10) j = 10;
+		dec  = (uint32_t)data;
+		if ( dec == 0 ) {			text_char[ i++ ] = '0';
+		}
+	} while ( (dec == 0) && (i <= FLOAT_PRECISION ) );
 
-	dec = (uint32_t )powf( 10, FLOAT_PRECISION - j )*data;   // 10000000 * data
-
-	itoa( (uint32_t)dec, text_char + i - SHIFT_MINUS, 10 );
+	dec = (uint32_t )powf( 10, FLOAT_PRECISION - (i - 1) )*data;   // 10000000 * data
+	itoa( (uint32_t)dec, text_char + i, 10 );
 
 	(void)graphic_char_to_wide( text_wchar, text_char );
     string->stringLength = graphic_puts_RAM( buffer, string, textSize, color, bg, gamma );
