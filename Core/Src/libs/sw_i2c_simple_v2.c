@@ -237,15 +237,19 @@ void sw_i2c_simple_init(void) {
 	RCC->APB1ENR  |= RCC_APB1ENR_I2C1EN;
 #endif
 
-	CLEAR_BIT( hI2Cx->I2C->CR1, I2C_CR1_PE );
-	while( (hI2Cx->I2C->CR1 & I2C_CR1_PE) );
+	SET_BIT	 ( hI2Cx->I2C->CR1, I2C_CR1_SWRST );	// Software reset
+	delay_ms(100);
+	CLEAR_BIT( hI2Cx->I2C->CR1, I2C_CR1_SWRST );
+
+//	CLEAR_BIT( hI2Cx->I2C->CR1, I2C_CR1_PE );
+//	while( (hI2Cx->I2C->CR1 & I2C_CR1_PE) );
 
 	gpio_pin_cfg( hI2Cx->scl_port,  hI2Cx->scl_pin,  hI2Cx->alternateFun );
 	gpio_pin_cfg( hI2Cx->sda_port,  hI2Cx->sda_pin,  hI2Cx->alternateFun );
 	gpio_pin_HI ( hI2Cx->scl_port,  hI2Cx->scl_pin );
 	gpio_pin_HI ( hI2Cx->sda_port,  hI2Cx->sda_pin );
 
-	hI2Cx->I2C->TIMINGR  = (uint32_t)I2C_TIMING_80MHz_400KHz;
+	hI2Cx->I2C->TIMINGR  = (uint32_t)I2C_TIMING_80MHz_100KHz;
 	SET_BIT( hI2Cx->I2C->CR1, I2C_CR1_PE );
 }
 

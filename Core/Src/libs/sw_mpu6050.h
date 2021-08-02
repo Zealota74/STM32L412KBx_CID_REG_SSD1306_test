@@ -24,7 +24,7 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define MPU6050_ADDRESS               (0x69<<1) // 0x69 when AD0 pin to Vcc, 0x68 AD0 floating
+#define MPU6050_ADDRESS               (0x68<<1) // 0x69 when AD0 pin to Vcc, 0x68 AD0 floating
 
 #define MPU6050_REG_ACCEL_XOFFS_H     (0x06)
 #define MPU6050_REG_ACCEL_XOFFS_L     (0x07)
