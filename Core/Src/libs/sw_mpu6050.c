@@ -39,7 +39,7 @@ static uint8_t 	MPU6050__fastRegister8( uint8_t reg ) {
 //	Wire.requestFrom( mpuAddress, 1 );
 //	value = Wire.receive();
 //	Wire.endTransmission();
-	sw_i2c_read_reg( MPU6050_ADDRESS, reg, &value );
+	sw_i2c_read_reg8( MPU6050_ADDRESS, reg, &value );
 	delay_us( MPU6050_DELAY );
 	return value;
 }
@@ -55,7 +55,7 @@ static uint8_t 	MPU6050__readRegister8( uint8_t reg ) {
 //	value = Wire.read();
 //	value = Wire.receive();
 //	Wire.endTransmission();
-	sw_i2c_read_reg( MPU6050_ADDRESS, reg, &value );
+	sw_i2c_read_reg8( MPU6050_ADDRESS, reg, &value );
 
 	delay_us( MPU6050_DELAY );
 	return value;
@@ -66,13 +66,30 @@ static void 	MPU6050__writeRegister8( uint8_t reg, uint8_t value ) {
 //	Wire.send( reg );
 //	Wire.send( value );
 //	Wire.endTransmission();
-	sw_i2c_write_reg( MPU6050_ADDRESS, reg, value );
+	sw_i2c_write_reg8( MPU6050_ADDRESS, reg, value );
+
+	delay_us( MPU6050_DELAY );
+}
+
+static void		MPU6050__writeRegister16( uint8_t reg, int16_t value ) {
+//	Wire.beginTransmission(mpuAddress);
+//	Wire.send(reg);
+//	Wire.send((uint8_t)(value >> 8));
+//	Wire.send((uint8_t)value);
+//	Wire.endTransmission();
+
+//	uint8_t buff[2];
+//	buff[0] = (uint8_t)(value >> 8);
+//	buff[1] = (uint8_t)value;
+//	sw_i2c_write_bulk( MPU6050_ADDRESS, reg, 2, buff );
+
+	sw_i2c_write_reg16( MPU6050_ADDRESS, reg, (uint16_t)value );
 
 	delay_us( MPU6050_DELAY );
 }
 
 static int16_t	MPU6050__readRegister16( uint8_t reg ) {
-	int16_t value = 0;
+	uint16_t value = 0;
 
 //	Wire.beginTransmission(mpuAddress);
 //	Wire.send(reg);
@@ -87,32 +104,20 @@ static int16_t	MPU6050__readRegister16( uint8_t reg ) {
 //
 //	value = vha << 8 | vla;
 
-	uint8_t buff[2];
-	sw_i2c_read_bulk( MPU6050_ADDRESS, reg, 2, buff );
-	uint8_t vha = buff[0];
-	uint8_t vla = buff[1];
-	value = vha << 8 | vla;
+//	uint8_t buff[2];
+//	sw_i2c_read_bulk( MPU6050_ADDRESS, reg, 2, buff );
+//
+//	uint8_t vha = buff[0];
+//	uint8_t vla = buff[1];
+//	value = vha << 8 | vla;
+	sw_i2c_read_reg16( MPU6050_ADDRESS, reg, &value );
 
 	delay_us( MPU6050_DELAY );
-	return value;
+	return (int16_t)value;
 }
 
-static void		MPU6050__writeRegister16( uint8_t reg, int16_t value ) {
-//	Wire.beginTransmission(mpuAddress);
-//	Wire.send(reg);
-//	Wire.send((uint8_t)(value >> 8));
-//	Wire.send((uint8_t)value);
-//	Wire.endTransmission();
-
-	uint8_t buff[2];
-	buff[0] = (uint8_t)(value >> 8);
-	buff[1] = (uint8_t)value;
-	sw_i2c_write_bulk( MPU6050_ADDRESS, reg, 2, buff );
-
-	delay_us( MPU6050_DELAY );
-}
 // Read register bit
-static bool		MPU6050__readRegisterBit( uint8_t reg, uint8_t pos ) {
+static bool	MPU6050__readRegisterBit( uint8_t reg, uint8_t pos ) {
 	uint8_t value;
 	value = MPU6050__readRegister8(reg);
 	return ((value >> pos) & 1);
@@ -479,6 +484,10 @@ struct Vector MPU6050__readRawAccel(void) {
 	ra.XAxis = xha << 8 | xla;
 	ra.YAxis = yha << 8 | yla;
 	ra.ZAxis = zha << 8 | zla;
+
+	ra.XAxis = (float)(xha << 8 | xla);
+	ra.YAxis = (float)(yha << 8 | yla);
+	ra.ZAxis = (float)(zha << 8 | zla);
 
 	return ra;
 }

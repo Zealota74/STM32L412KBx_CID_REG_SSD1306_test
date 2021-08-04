@@ -172,7 +172,7 @@ static void paj7620_write_reg( uint8_t addr, uint8_t cmd ) {
 	i2c_write( cmd );
 	i2c_stop();
 #elif defined STM32F3 || defined STM32L4
-	sw_i2c_write_reg( PAJ7620_ADDR, addr, cmd );
+	sw_i2c_write_reg8( PAJ7620_ADDR, addr, cmd );
 	delay_us(100);
 #endif
 }

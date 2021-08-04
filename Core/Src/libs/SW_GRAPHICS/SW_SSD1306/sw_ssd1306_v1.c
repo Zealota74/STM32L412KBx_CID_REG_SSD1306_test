@@ -69,7 +69,7 @@ static void WriteCmd( uint8_t cmd ) {
 	CS_HI;
 	#endif
 #elif (TRANSMISSION_MODE==SOFT_I2C) || (TRANSMISSION_MODE==HARD_I2C)
-	sw_i2c_write_reg( I2C_ADDRESS, I2C_CTRL_DC_0, cmd );
+	sw_i2c_write_reg8( I2C_ADDRESS, I2C_CTRL_DC_0, cmd );
 #endif
 	delay_us(20);
 }

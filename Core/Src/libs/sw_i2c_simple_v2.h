@@ -11,6 +11,8 @@
 /******************************* Definition *********************************/
 #define DUMMY 						0
 #define I2C_CR2_NBYTE_MAX			255
+#define I2C_REPEATED_START			1
+#define I2C_START_STOP				0
 
 // I2C standard mode
 #define I2C_TIMING_8MHz_100KHz		0x00201D2B
@@ -48,7 +50,7 @@ typedef struct {
 	T_GPIO_PIN 	    scl_pin, 	sda_pin;
 } I2C_t;
 typedef enum {
-	I2C_Ok = 0, I2C_Error = 1, I2C_Nack = 2
+	I2C_Ok = 0, I2C_Error = 1, I2C_Nack = 2, I2C_RXNE_Er = 3
 } I2CSTATUS;
 typedef enum {
 	I2C_Ready = true, I2C_NotReady = false
@@ -117,12 +119,14 @@ static INLINE void	sw_i2c_set_bitrate( uint32_t bitrate) {
 
 extern void sw_i2c_simple_init(void);
 
-extern I2CSTATUS sw_i2c_write_byte( uint8_t byte );
-extern I2CSTATUS sw_i2c_read_byte ( uint8_t * byte );
+//extern I2CSTATUS sw_i2c_write_byte( uint8_t byte, bool restart );
+//extern I2CSTATUS sw_i2c_read_byte ( uint8_t * byte );
 extern I2CSTATUS sw_i2c_write_bulk( uint8_t devAddr, uint8_t regAddr, uint16_t nBytes, const uint8_t * pBuff );
 extern I2CSTATUS sw_i2c_read_bulk ( uint8_t  devAddr, uint8_t regAddr, uint16_t nBytes, uint8_t * pBuff );
-extern I2CSTATUS sw_i2c_write_reg ( uint8_t devAddr, uint8_t reg, uint8_t data );
-extern I2CSTATUS sw_i2c_read_reg  ( uint8_t devAddr, uint8_t reg, uint8_t *data );
+extern I2CSTATUS sw_i2c_write_reg8( uint8_t devAddr, uint8_t reg, uint8_t data );
+extern I2CSTATUS sw_i2c_read_reg8 ( uint8_t devAddr, uint8_t reg, uint8_t *data );
+extern I2CSTATUS sw_i2c_write_reg16( uint8_t devAddr, uint8_t reg, uint16_t word );
+extern I2CSTATUS sw_i2c_read_reg16( uint8_t devAddr, uint8_t reg, uint16_t * word );
 extern I2CSTATUS sw_i2c_IsDeviceReady( uint8_t devAddr, uint32_t trials, uint16_t delayMS );
 
 extern I2CSTATUS sw_i2c_slave_test( uint8_t devAddr );

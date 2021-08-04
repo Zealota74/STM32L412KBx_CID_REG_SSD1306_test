@@ -110,23 +110,23 @@ bool mpu6050_test_init(void) {
 	if( false == MPU6050__init( MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G ) ) {
 		return false;
 	}
-	MPU6050__calibrateGyro( 5 );	// Kalibracja żyroskopu
-	MPU6050__setThreshold( 3 );		// Ustawienie czułości
+//	MPU6050__calibrateGyro( 5 );	// Kalibracja żyroskopu
+//	MPU6050__setThreshold( 3 );		// Ustawienie czułości
 	return true;
 }
 void mpu6050_test_loop(void) {
 //	struct Vector rawGyro;
-	struct Vector normGyro;
+//	struct Vector normGyro;
 
 
 //	rawGyro		= MPU6050__readRawGyro();
 //	rawGyro		= MPU6050__readRawAccel();
-	normGyro	= MPU6050__readNormalizeGyro();
 //	normGyro	= MPU6050__readNormalizeAccel();
-	normGyro.XAxis = srednia1( normGyro.XAxis );
-	TEXT_display_float( 0, 0,  normGyro.XAxis, &TextX );
-	TEXT_display_float( 0, 16, normGyro.YAxis, &TextY );
-	TEXT_display_float( 0, 32, normGyro.ZAxis, &TextZ );
+//	normGyro	= MPU6050__readNormalizeGyro();
+//	normGyro.XAxis = srednia1( normGyro.XAxis );
+//	TEXT_display_float( 0, 0,  normGyro.XAxis, &TextX );
+//	TEXT_display_float( 0, 16, normGyro.YAxis, &TextY );
+//	TEXT_display_float( 0, 32, normGyro.ZAxis, &TextZ );
 
 // Calculate Pitch, Roll and Yaw
 //	static unsigned long 	timer 	 = 0;
@@ -143,6 +143,14 @@ void mpu6050_test_loop(void) {
 //	TEXT_display_float( 0, 16, roll,  &TextY );
 //	TEXT_display_float( 0, 32, yaw,	  &TextZ );
 //	delay_ms( (timeStep*1000) - (millis() - timer));
+
+	struct Vector normAccel = MPU6050__readNormalizeAccel();
+
+	int pitch = -(atan2(normAccel.XAxis, sqrt(normAccel.YAxis*normAccel.YAxis + normAccel.ZAxis*normAccel.ZAxis))*180.0) / M_PI;
+	int roll  =  (atan2(normAccel.YAxis, normAccel.ZAxis)*180.0) / M_PI;
+	TEXT_display_number( 0, 0,  pitch, &TextX );
+	TEXT_display_number( 0, 16, roll, &TextY );
+
 
 	float temp = MPU6050__readTemperature();
 	TEXT_display_float( 0, 48, temp, &Temp );

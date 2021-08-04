@@ -24,11 +24,11 @@ static void sw_hardware_TWI_read_buf( uint8_t devAddr, uint8_t reg, uint16_t nBy
 }
 
 static void vcnl4010_write_reg( uint8_t devReg, uint8_t data ) {
-	sw_i2c_write_reg( VCNL4010_I2C_ADDR, devReg, data );
+	sw_i2c_write_reg8( VCNL4010_I2C_ADDR, devReg, data );
 	delay_us(20);
 }
 static void vcnl4010_read_reg( uint8_t devReg, uint8_t *data ) {
-	sw_i2c_read_reg( VCNL4010_I2C_ADDR, devReg, data );
+	sw_i2c_read_reg8( VCNL4010_I2C_ADDR, devReg, data );
 	delay_us(20);
 }
 
