@@ -31,7 +31,7 @@ void ADXL345__writeRegister8(uint8_t reg, uint8_t value) {
 //	Wire.send(reg);
 //	Wire.send(value);
 //	Wire.endTransmission();
-	sw_i2c_write_reg( ADXL345_ADDRESS, reg, value );
+	sw_i2c_write_reg8( ADXL345_ADDRESS, reg, value );
 }
 
 // Read byte to register
@@ -44,7 +44,7 @@ uint8_t ADXL345__fastRegister8(uint8_t reg) {
 //	Wire.requestFrom(ADXL345_ADDRESS, 1);
 //	value = Wire.receive();
 //	Wire.endTransmission();
-	sw_i2c_read_reg( ADXL345_ADDRESS, reg, &value );
+	sw_i2c_read_reg8( ADXL345_ADDRESS, reg, &value );
 	return value;
 }
 
@@ -61,7 +61,7 @@ uint8_t ADXL345__readRegister8(uint8_t reg) {
 //	value = Wire.receive();
 //	Wire.endTransmission();
 
-	sw_i2c_read_reg( ADXL345_ADDRESS, reg, &value );
+	sw_i2c_read_reg8( ADXL345_ADDRESS, reg, &value );
 	return value;
 }
 

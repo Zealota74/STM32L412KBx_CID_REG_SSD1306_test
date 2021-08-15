@@ -12,8 +12,7 @@
 #include "sw_i2c_simple_v2.h"
 
 
-
-
+/****************************** Base static functions ********************************/
 //static INLINE void sw_i2c_autoend_on(void)  { hI2Cx->I2C->CR2 |=  I2C_CR2_AUTOEND; }
 static INLINE void sw_i2c_autoend_off(void) { hI2Cx->I2C->CR2 &= ~I2C_CR2_AUTOEND; }
 static INLINE void sw_i2c_nBytes( uint8_t nBytes ) {
@@ -28,7 +27,7 @@ static INLINE I2CSTATUS sw_i2c_isTXIS_error(void) {
 		if ( whileTimer == 0 && sw_is_NACK_flag_ready() ) {
 			return I2C_Nack;
 		}
-	}	// All bytes send nBytes = 1
+	}	// All bytes send
 	return I2C_Ok;
 }
 static INLINE I2CSTATUS sw_i2c_isTC_error(void) {
@@ -64,9 +63,10 @@ static I2CSTATUS sw_i2c_read_buff( uint16_t nBytes, uint8_t * pBuff ) {
 	}
 	return I2C_Ok;
 }
+/********************************************************************************/
 
 
-/*********************************** Write 1 byte ********************************/
+/*********************************** Write 1 byte *******************************/
 static I2CSTATUS sw_i2c_write_byte( uint8_t byte, bool repeatedStart ) {
 	sw_i2c_write_dir();
 	sw_i2c_autoend_off();
@@ -76,12 +76,13 @@ static I2CSTATUS sw_i2c_write_byte( uint8_t byte, bool repeatedStart ) {
 	if ( sw_i2c_isTXIS_error() != I2C_Ok ) return I2C_Error;
 
 	sw_i2c_write( byte );
-	if ( sw_i2c_isTC_error() != I2C_Ok ) return I2C_Error;
+	if ( sw_i2c_isTC_error()   != I2C_Ok ) return I2C_Error;
 
 	if ( !repeatedStart ) sw_i2c_stop();
 	return I2C_Ok;
 }
 /********************************************************************************/
+
 /*********************************** Read 1 byte ********************************
 static I2CSTATUS sw_i2c_read_byte( uint8_t * byte ) {
 	sw_i2c_read_dir();
@@ -108,7 +109,7 @@ I2CSTATUS sw_i2c_write_bulk( uint8_t  devAddr, uint8_t regAddr,
 	sw_i2c_write_dir();
 
 	nBytes++;											// nBytes + 1 (regAddr byte)
-	if ( nBytes < I2C_CR2_NBYTE_MAX + 1) {
+	if ( nBytes < I2C_CR2_NBYTE_MAX + 1 ) {
 		sw_i2c_nBytes( nBytes );
 		nBytes--;
 	} else {
@@ -196,8 +197,9 @@ I2CSTATUS sw_i2c_read_bulk ( uint8_t  devAddr, uint8_t  regAddr,
 	sw_i2c_stop();
 	return I2C_Ok;
 }
+/********************************************************************************/
 
-
+/**************************** Registers functions *******************************/
 I2CSTATUS sw_i2c_write_reg8( uint8_t devAddr, uint8_t reg, uint8_t data ) {
 	sw_i2c_set_7bitAddr( devAddr );
 	sw_i2c_write_dir();
@@ -267,6 +269,7 @@ I2CSTATUS sw_i2c_read_reg16( uint8_t devAddr, uint8_t reg, uint16_t * word ) {
 	sw_i2c_nBytes(1);
 	sw_i2c_start(); 		if ( sw_i2c_isTXIS_error() != I2C_Ok ) return I2C_Error;
 	sw_i2c_write( reg ); 	if ( sw_i2c_isTC_error()   != I2C_Ok ) return I2C_Error;
+
 //	sw_i2c_stop();
 
 	sw_i2c_read_dir();
@@ -279,7 +282,9 @@ I2CSTATUS sw_i2c_read_reg16( uint8_t devAddr, uint8_t reg, uint16_t * word ) {
 	sw_i2c_stop();
 	return I2C_Ok;;
 }
+/********************************************************************************/
 
+/******************************* Init function *********************************/
 void sw_i2c_simple_init(void) {
 #ifdef STM32L4
 	RCC->APB1RSTR1 |=  RCC_APB1RSTR1_I2C1RST;
@@ -290,7 +295,6 @@ void sw_i2c_simple_init(void) {
 	RCC->APB1RSTR &= ~RCC_APB1RSTR_I2C1RST;
 	RCC->APB1ENR  |= RCC_APB1ENR_I2C1EN;
 #endif
-
 	SET_BIT	 ( hI2Cx->I2C->CR1, I2C_CR1_SWRST );	// Software reset
 	delay_ms(100);
 	CLEAR_BIT( hI2Cx->I2C->CR1, I2C_CR1_SWRST );
@@ -307,7 +311,8 @@ void sw_i2c_simple_init(void) {
 	SET_BIT( hI2Cx->I2C->CR1, I2C_CR1_PE );
 }
 
-I2CSTATUS sw_i2c_IsDeviceReady( uint8_t devAddr, uint32_t trials, uint16_t delayMS ) {
+/******************************** Some tests functions ******************************/
+I2CSTATUS sw_i2c_slave_test( uint8_t devAddr, uint32_t trials, uint16_t delayMS ) {
 	sw_i2c_set_7bitAddr( devAddr );
 	while (trials--) {
 		sw_i2c_start();
@@ -319,20 +324,7 @@ I2CSTATUS sw_i2c_IsDeviceReady( uint8_t devAddr, uint32_t trials, uint16_t delay
 	}
 	return I2C_Ok;
 }
-
-I2CSTATUS sw_i2c_slave_test( uint8_t devAddr ) {
-	I2CSTATUS i2cstatus = I2C_Ok;
-	sw_i2c_set_7bitAddr( devAddr );
-
-	sw_i2c_autoend_off();
-	sw_i2c_write_dir();
-	if ( sw_i2c_start() == I2C_Ok )
-		i2cstatus = I2C_Ok;
-	else
-		i2cstatus = I2C_Error;
-
-	return i2cstatus;
-}
+/***********************************************************************************/
 
 
 #ifdef I2C_TEST

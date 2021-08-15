@@ -11,6 +11,7 @@
 #include "sw_soft_timers.h"
 
 #include "../SW_BOARD/sw_led_blink_debug.h"
+#include "../keyboard.h"
 
 // https://deepbluembedded.com/stm32-delay-microsecond-millisecond-utility-dwt-delay-timer-delay/
 uint32_t DWT_Delay_Init(void) {
@@ -40,6 +41,26 @@ uint32_t DWT_Delay_Init(void) {
 	}
 }
 
+#define PRIGROUP_0G_16S	((const uint32_t) 0x07)
+#define PRIGROUP_2G_8S	((const uint32_t) 0x06)
+#define PRIGROUP_4G_4S	((const uint32_t) 0x05)
+#define PRIGROUP_8G_2S	((const uint32_t) 0x04)
+#define PRIGROUP_16G_0S	((const uint32_t) 0x03)
+
+/************************ Interrupt priority*******************************/
+void nvic_priority(void) {
+	uint32_t prio;
+	NVIC_SetPriorityGrouping( PRIGROUP_4G_4S );
+
+	prio = NVIC_EncodePriority( PRIGROUP_4G_4S, 0, 0 ); // Draw the spectrum in RAM
+	NVIC_SetPriority( SysTick_IRQn, prio );
+
+	prio = NVIC_EncodePriority( PRIGROUP_4G_4S, 1, 0 ); // Update clock
+	NVIC_SetPriority( EXTI3_IRQn, prio );
+
+}
+/************************************************************************/
+
 /**** Inicjujemy SysTick pod timery programowe *****/
 uint32_t sw_softTimers_init( uint32_t timeBase_ms, uint32_t type ) {
 //	register_irDecoded_event_callback(sw_switch_mode);
@@ -51,9 +72,11 @@ uint32_t sw_softTimers_init( uint32_t timeBase_ms, uint32_t type ) {
 	if ( type==MICRO_SEC ) {
 		DWT_Delay_Init();
 	}
+	nvic_priority();
 	return 1;									// ok
 }
 /***************************************************/
+
 
 /******************************************************************************/
 volatile uint16_t pressTimer, debounceTimer, repeatTimer;
@@ -77,6 +100,9 @@ void SysTick_Handler( void ) {
 
 	sw_led_blinking();
 //	SW_IR_DECODED_EVENT();
+	SW_KEYBOARD_EVENT();
+
+//	key_handler();
 }
 /******************************************************************************/
 uint32_t millis(void) {

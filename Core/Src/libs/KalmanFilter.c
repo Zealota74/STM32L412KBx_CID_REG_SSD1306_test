@@ -16,62 +16,99 @@
 
 #include "KalmanFilter.h"
 
-static double Q_angle, Q_bias, R_measure;
-static double K_angle, K_bias, K_rate;
-static double P[2][2], K[2];
-static double S, y;
-static double dt, kt;
+static float Q_angle; // Process noise variance for the accelerometer
+static float Q_bias; // Process noise variance for the gyro bias
+static float R_measure; // Measurement noise variance - this is actually the variance of the measurement noise
 
-double micros(void) {
-	return 0;
-}
-//void KalmanFilter(double angle = 0.001, double bias = 0.003, double measure = 0.03);
+static float angle; // The angle calculated by the Kalman filter - part of the 2x1 state vector
+static float bias; // The gyro bias calculated by the Kalman filter - part of the 2x1 state vector
+static float rate; // Unbiased rate calculated from the rate and the calculated bias - you have to call getAngle to update the rate
 
-void KalmanFilter__KalmanFilter(double angle, double bias, double measure) {
-	Q_angle 	= angle;
-	Q_bias 		= bias;
-	R_measure 	= measure;
+static float P[2][2]; // Error covariance matrix - This is a 2x2 matrix
 
-	K_angle = 0;
-	K_bias 	= 0;
+struct Vector {
+	float angle;
+	float bias;
+	float rate;
+	float Q_angle;
+	float Q_bias;
+	float R_measure;
+};
+static struct Vector this;
 
-	P[0][0] = 0;
-	P[0][1] = 0;
-	P[1][0] = 0;
-	P[1][1] = 0;
+void Kalman__init(void) {
+    /* We will set the variables like so, these can also be tuned by the user */
+    Q_angle = 0.001f;
+    Q_bias = 0.003f;
+    R_measure = 0.03f;
 
-	kt = (double) micros();
-}
+    angle = 0.0f; // Reset the angle
+    bias = 0.0f; // Reset bias
 
-double KalmanFilter__update(double newValue, double newRate) {
-	dt = (double) (micros() - kt) / 1000000;
+    P[0][0] = 0.0f; // Since we assume that the bias is 0 and we know the starting angle (use setAngle), the error covariance matrix is set like so - see: http://en.wikipedia.org/wiki/Kalman_filter#Example_application.2C_technical
+    P[0][1] = 0.0f;
+    P[1][0] = 0.0f;
+    P[1][1] = 0.0f;
+};
 
-	K_rate = newRate - K_bias;
-	K_angle += dt * K_rate;
+// The angle should be in degrees and the rate should be in degrees per second and the delta time in seconds
+float Kalman__getAngle( float newAngle, float newRate, float dt) {
+    // KasBot V2  -  Kalman filter module - http://www.x-firm.com/?page_id=145
+    // Modified by Kristian Lauszus
+    // See my blog post for more information: http://blog.tkjelectronics.dk/2012/09/a-practical-approach-to-kalman-filter-and-how-to-implement-it
 
-	P[0][0] += dt * (P[1][1] + P[0][1]) + Q_angle * dt;
-	P[0][1] -= dt * P[1][1];
-	P[1][0] -= dt * P[1][1];
-	P[1][1] += Q_bias * dt;
+    // Discrete Kalman filter time update equations - Time Update ("Predict")
+    // Update xhat - Project the state ahead
+    /* Step 1 */
+    rate 	= newRate - bias;
+    angle  += dt * rate;
 
-	S = P[0][0] + R_measure;
+    // Update estimation error covariance - Project the error covariance ahead
+    /* Step 2 */
+    P[0][0] += dt * (dt*P[1][1] - P[0][1] - P[1][0] + Q_angle);
+    P[0][1] -= dt * P[1][1];
+    P[1][0] -= dt * P[1][1];
+    P[1][1] += Q_bias * dt;
 
-	K[0] = P[0][0] / S;
-	K[1] = P[1][0] / S;
+    // Discrete Kalman filter measurement update equations - Measurement Update ("Correct")
+    // Calculate Kalman gain - Compute the Kalman gain
+    /* Step 4 */
+    float S = P[0][0] + R_measure; // Estimate error
+    /* Step 5 */
+    float K[2]; // Kalman gain - This is a 2x1 vector
+    K[0] = P[0][0] / S;
+    K[1] = P[1][0] / S;
 
-	y = newValue - K_angle;
+    // Calculate angle and bias - Update estimate with measurement zk (newAngle)
+    /* Step 3 */
+    float y = newAngle - angle; // Angle difference
+    /* Step 6 */
+    angle += K[0] * y;
+    bias += K[1] * y;
 
-	K_angle += K[0] * y;
-	K_bias += K[1] * y;
+    // Calculate estimation error covariance - Update the error covariance
+    /* Step 7 */
+    float P00_temp = P[0][0];
+    float P01_temp = P[0][1];
 
-	P[0][0] -= K[0] * P[0][0];
-	P[0][1] -= K[0] * P[0][1];
-	P[1][0] -= K[1] * P[0][0];
-	P[1][1] -= K[1] * P[0][1];
+    P[0][0] -= K[0] * P00_temp;
+    P[0][1] -= K[0] * P01_temp;
+    P[1][0] -= K[1] * P00_temp;
+    P[1][1] -= K[1] * P01_temp;
 
-	kt = (double) micros();
+    return angle;
+};
 
-	return K_angle;
-}
+void  Kalman__setAngle( float angle ) { this.angle = angle; }; 	// Used to set angle, this should be set as the starting angle
+float Kalman__getRate() { return this.rate; }; 				// Return the unbiased rate
 
+/* These are used to tune the Kalman filter */
+void  Kalman__setQangle( float Q_angle ) { this.Q_angle = Q_angle; };
+float Kalman__getQangle() { return this.Q_angle; };
+
+void  Kalman__setQbias( float Q_bias ) { this.Q_bias = Q_bias; };
+float Kalman__getQbias() { return this.Q_bias; };
+
+void  Kalman__setRmeasure( float R_measure ) { this.R_measure = R_measure; };
+float Kalman__getRmeasure() { return this.R_measure; };
 

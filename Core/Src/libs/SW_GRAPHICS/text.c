@@ -302,7 +302,7 @@ void rtc_puts_int_RAM( volatile T_DISPLAY *buffer, T_STRING *string, int data, u
 	string->stringLength = graphic_puts_RAM( buffer, string, textSize, color, bg, gamma );
 }
 
-#define FLOAT_PRECISION	10
+#define FLOAT_PRECISION	6		// Numbers to display + dot and sign character
 static void graphic_puts_float_RAM( volatile T_DISPLAY *buffer, T_STRING *string, float data, uint8_t textSize,
 							 	 	 uint32_t color, uint32_t bg, const T_GAMMA *gamma ) {
 	char 	text_char [ FLOAT_PRECISION + 3 ];	// Sign, dot and '\0'
@@ -331,11 +331,12 @@ static void graphic_puts_float_RAM( volatile T_DISPLAY *buffer, T_STRING *string
 	do {									// Find first zeros after the dot
 		data = (float32_t)data*10;
 		dec  = (uint32_t)data;
-		if ( dec == 0 ) {			text_char[ i++ ] = '0';
+		if ( dec == 0 ) {
+			text_char[ i++ ] = '0';
 		}
 	} while ( (dec == 0) && (i <= FLOAT_PRECISION ) );
 
-	dec = (uint32_t )powf( 10, FLOAT_PRECISION - (i - 1) )*data;   // 10000000 * data
+	dec = (uint32_t)powf( 10, FLOAT_PRECISION - (i - 1) )*data;   // 10000000 * data
 	itoa( (uint32_t)dec, text_char + i, 10 );
 
 	(void)graphic_char_to_wide( text_wchar, text_char );

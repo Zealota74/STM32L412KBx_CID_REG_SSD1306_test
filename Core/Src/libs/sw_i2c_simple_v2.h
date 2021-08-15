@@ -41,8 +41,9 @@
 #define I2C_TIMING_80MHz_1000KHz	0x00300F33
 
 #define I2C_SLAVE_ADDR				0x0D
+/*******************************************************************************/
 
-/***************************************************************************/
+/********************************* Base variable *******************************/
 typedef struct {
 	I2C_TypeDef * 	I2C;
 	T_GPIO_MODE 	alternateFun;
@@ -67,8 +68,9 @@ static const I2C_t i2c2 	= { I2C2, gpio_mode_AF4_OD_HS, PORTA, PORTA, PA10, PA9 
 
 #endif
 static const I2C_t * hI2Cx = &i2c1Alt1;
+/******************************************************************************/
 
-/***************************************************************************/
+/*************************** FLAG functions ***********************************/
 static INLINE bool sw_is_TC_flag_ready(void) {
 	if( hI2Cx->I2C->ISR & I2C_ISR_TC ) return true; else  return false;
 }
@@ -87,12 +89,12 @@ static INLINE bool sw_is_RXNE_flag_ready(void) {
 static INLINE bool sw_is_BUSY_flag_ready(void) {
 	if( hI2Cx->I2C->ISR & I2C_ISR_BUSY ) return true; else  return false;
 }
-
 static INLINE void sw_i2c_set_7bitAddr( uint8_t devAddr ) {
 	MODIFY_REG( hI2Cx->I2C->CR2, I2C_CR2_SADD, devAddr << I2C_CR2_SADD_Pos );
 }
+/******************************************************************************/
 
-
+/**************************** Really base functions ***************************/
 static INLINE I2CSTATUS sw_i2c_start( void ) {
 	hI2Cx->I2C->CR2 |= I2C_CR2_START;
 	return I2C_Ok;
@@ -100,7 +102,6 @@ static INLINE I2CSTATUS sw_i2c_start( void ) {
 static INLINE void 		sw_i2c_stop(void)  {
 	hI2Cx->I2C->CR2 |= I2C_CR2_STOP;
 	while ( (hI2Cx->I2C->ISR & I2C_ISR_STOPF) == 0) {}
-//	hI2Cx->I2C->ICR = I2C_ICR_STOPCF;
 }
 static INLINE I2CSTATUS sw_i2c_write( uint8_t data ) {
 	hI2Cx->I2C->TXDR = data;								// First write byte
@@ -114,28 +115,25 @@ static INLINE uint8_t	sw_i2c_read( uint8_t dummy ) {
 static INLINE void	sw_i2c_set_bitrate( uint32_t bitrate) {
 
 }
+/******************************************************************************/
 
-
-
+/********************************* Extern functions ***************************/
 extern void sw_i2c_simple_init(void);
 
-//extern I2CSTATUS sw_i2c_write_byte( uint8_t byte, bool restart );
-//extern I2CSTATUS sw_i2c_read_byte ( uint8_t * byte );
 extern I2CSTATUS sw_i2c_write_bulk( uint8_t devAddr, uint8_t regAddr, uint16_t nBytes, const uint8_t * pBuff );
 extern I2CSTATUS sw_i2c_read_bulk ( uint8_t  devAddr, uint8_t regAddr, uint16_t nBytes, uint8_t * pBuff );
 extern I2CSTATUS sw_i2c_write_reg8( uint8_t devAddr, uint8_t reg, uint8_t data );
 extern I2CSTATUS sw_i2c_read_reg8 ( uint8_t devAddr, uint8_t reg, uint8_t *data );
 extern I2CSTATUS sw_i2c_write_reg16( uint8_t devAddr, uint8_t reg, uint16_t word );
 extern I2CSTATUS sw_i2c_read_reg16( uint8_t devAddr, uint8_t reg, uint16_t * word );
-extern I2CSTATUS sw_i2c_IsDeviceReady( uint8_t devAddr, uint32_t trials, uint16_t delayMS );
-
-extern I2CSTATUS sw_i2c_slave_test( uint8_t devAddr );
+extern I2CSTATUS sw_i2c_slave_test( uint8_t devAddr, uint32_t trials, uint16_t delayMS );
 
 #ifdef I2C_TEST
 extern void 	 sw_ds3231_test(void);
 extern void 	 sw_ds3231_eeprom_test( void );
 extern void sw_i2c_test_write(uint8_t devAddr);
 #endif
+/******************************************************************************/
 
 
 #endif /* SRC_LIBS_SW_I2C_SIMPLE_H_ */

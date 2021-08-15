@@ -289,7 +289,7 @@ uint8_t paj7620_init( TFPS fps ) {
   	i2c_stop();
 #elif defined STM32F3 || defined STM32L4
 	uint8_t res;
-	if ( sw_i2c_IsDeviceReady( PAJ7620_ADDR, 2, 1 ) == I2C_Error ) {
+	if ( sw_i2c_slave_test( PAJ7620_ADDR, 2, 1 ) == I2C_Nack ) {
 		res = 0;
 	} else {
 		res = 1;

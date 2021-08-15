@@ -86,17 +86,17 @@ uint8_t vcnl4010_init( void ) {
 
 	RCC->APB2ENR 		|= RCC_APB2ENR_SYSCFGEN;
 	SYSCFG->EXTICR[0] 	|= SYSCFG_EXTICR1_EXTI3_PA;	// PB[3] pin
-	EXTI->FTSR1 		|= EXTI_FTSR1_FT3;			// Falling trigger event configuration bit of line 3
-	EXTI->RTSR1 		|= EXTI_RTSR1_RT3;			// Rising trigger event configuration bit of line 3
-	EXTI->IMR1 			|= EXTI_IMR1_IM3;			// Interrupt Mask on line 3
+	EXTI->FTSR1 		|= EXTI_FTSR1_FT2;			// Falling trigger event configuration bit of line 3
+	EXTI->RTSR1 		|= EXTI_RTSR1_RT2;			// Rising trigger event configuration bit of line 3
+	EXTI->IMR1 			|= EXTI_IMR1_IM2;			// Interrupt Mask on line 3
 
 	NVIC_EnableIRQ( EXTI3_IRQn );
 	return 1;
 }
 
-void EXTI3_IRQHandler(void) {
-	if (EXTI->PR1 & EXTI_PR1_PIF3) {				// Pending bit for line 3
-		EXTI->PR1 = EXTI_PR1_PIF3;
+void EXTI2_IRQHandler(void) {
+	if (EXTI->PR1 & EXTI_PR1_PIF2) {				// Pending bit for line 3
+		EXTI->PR1 = EXTI_PR1_PIF2;
 
 	}
 }

@@ -55,7 +55,7 @@ static void writeReg( uint8_t reg, uint8_t value ) {
 //	Wire.write(reg);
 //	Wire.write(value);
 //	last_status = Wire.endTransmission();
-	sw_i2c_write_reg( ADDRESS_DEFAULT, reg, value );
+	sw_i2c_write_reg8( ADDRESS_DEFAULT, reg, value );
 	delay_us(20);
 }
 // Read an 8-bit register
@@ -68,7 +68,7 @@ static uint8_t readReg( uint8_t reg ) {
 //
 //	Wire.requestFrom(address, (uint8_t) 1);
 //	value = Wire.read();
-	sw_i2c_read_reg( ADDRESS_DEFAULT, reg, &value );
+	sw_i2c_read_reg8( ADDRESS_DEFAULT, reg, &value );
 	delay_us(20);
 	return value;
 }

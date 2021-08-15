@@ -1,8 +1,20 @@
 /*
- * sw_MPU6050.c
+ * mpu6050.c
  *
- *  Created on: Jul 27, 2021
- *      Author: szymon.wroblewski
+ *  Created on: 08.10.2018
+ *  	License: MIT
+ *      Author: Mateusz Salamon
+ *      Based on:
+ *      	 - MPU-6000 and MPU-6050 Product Specification Revision 3.4
+ *      	 - MPU-6000 and MPU-6050 Register Map and Descriptions Revision 4.2
+ *      	 - i2cdevlib by Jeff Rowberg on MIT license
+ *      	 - SparkFun MPU-9250 Digital Motion Processor (DMP) Arduino Library on MIT License
+ *
+ *		www.msalamon.pl
+ *		mateusz@msalamon.pl
+ *
+ *	Website: https://msalamon.pl/6-stopni-swobody-z-mpu6050-na-stm32/
+ *	GitHub: https://github.com/lamik/MPU6050_STM32_HAL
  */
 
 #include "sw_mcu_conf.h"
@@ -10,131 +22,512 @@
 #include "SW_TIMERS/sw_soft_timers.h"
 #include "sw_i2c_simple_v2.h"
 
-#include <math.h>
-#include <stdlib.h>
 
 #include "sw_mpu6050.h"
+#include "math.h"
+#include <stdlib.h>
 
-static struct	Vector ra, rg; 		// Raw vectors
-static struct 	Vector na, ng; 		// Normalized vectors
-static struct 	Vector tg, dg; 		// Threshold and Delta for Gyro
-static struct 	Vector th;     		// Threshold
-static struct 	Activites a;		// Activities
+#define I2C_TIMEOUT 0
 
-static float	dpsPerDigit, rangePerDigit;
-static float	actualThreshold;
-static bool		useCalibrate;
+float Acc_Scale;
+float Gyr_Scale;
 
-#define MPU6050_DELAY	20
-
-/***************************** Static functions ****************************/
-// Fast read 8-bit from register
-static uint8_t 	MPU6050__fastRegister8( uint8_t reg ) {
-	uint8_t value = 0;
-//	Wire.beginTransmission( mpuAddress );
-//	Wire.send(reg);
-//	Wire.endTransmission();
-//
-//	Wire.beginTransmission( mpuAddress );
-//	Wire.requestFrom( mpuAddress, 1 );
-//	value = Wire.receive();
-//	Wire.endTransmission();
-	sw_i2c_read_reg8( MPU6050_ADDRESS, reg, &value );
-	delay_us( MPU6050_DELAY );
-	return value;
+static I2CSTATUS HAL_I2C_Mem_Read ( uint8_t devAddress, uint8_t regAddress, uint8_t regSize, uint8_t * buff, uint8_t len, uint8_t timeout ) {
+	I2CSTATUS status;
+	status = sw_i2c_read_bulk ( devAddress, regAddress, len, buff );
+	delay_ms(2);
+	return status;
 }
-// Read 8-bit from register
-static uint8_t 	MPU6050__readRegister8( uint8_t reg ) {
-	uint8_t value = 0;
-//	Wire.beginTransmission( mpuAddress );
-//	Wire.send( reg );
-//	Wire.endTransmission();
-//
-//	Wire.beginTransmission( mpuAddress );
-//	Wire.requestFrom( mpuAddress, 1 );
-//	value = Wire.read();
-//	value = Wire.receive();
-//	Wire.endTransmission();
-	sw_i2c_read_reg8( MPU6050_ADDRESS, reg, &value );
-
-	delay_us( MPU6050_DELAY );
-	return value;
-}
-// Write 8-bit to register
-static void 	MPU6050__writeRegister8( uint8_t reg, uint8_t value ) {
-//	Wire.beginTransmission( mpuAddress );
-//	Wire.send( reg );
-//	Wire.send( value );
-//	Wire.endTransmission();
-	sw_i2c_write_reg8( MPU6050_ADDRESS, reg, value );
-
-	delay_us( MPU6050_DELAY );
+static I2CSTATUS HAL_I2C_Mem_Write( uint8_t devAddress, uint8_t regAddress, uint8_t regSize, uint8_t * buff, uint8_t len, uint8_t timeout ) {
+	I2CSTATUS status;
+	status = sw_i2c_write_bulk( devAddress, regAddress, len, buff );
+	delay_ms(2);
+	return status;
 }
 
-static void		MPU6050__writeRegister16( uint8_t reg, int16_t value ) {
-//	Wire.beginTransmission(mpuAddress);
-//	Wire.send(reg);
-//	Wire.send((uint8_t)(value >> 8));
-//	Wire.send((uint8_t)value);
-//	Wire.endTransmission();
 
-//	uint8_t buff[2];
-//	buff[0] = (uint8_t)(value >> 8);
-//	buff[1] = (uint8_t)value;
-//	sw_i2c_write_bulk( MPU6050_ADDRESS, reg, 2, buff );
-
-	sw_i2c_write_reg16( MPU6050_ADDRESS, reg, (uint16_t)value );
-
-	delay_us( MPU6050_DELAY );
+//
+// CONFIG
+//
+void MPU6050_SetDlpf(uint8_t Value) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_CONFIG, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= 0xF8;
+	tmp |= (Value & 0x7);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_CONFIG, 1, &tmp, 1, I2C_TIMEOUT );
 }
 
-static int16_t	MPU6050__readRegister16( uint8_t reg ) {
-	uint16_t value = 0;
-
-//	Wire.beginTransmission(mpuAddress);
-//	Wire.send(reg);
-//	Wire.endTransmission();
 //
-//	Wire.beginTransmission(mpuAddress);
-//	Wire.requestFrom(mpuAddress, 2);
-//	while(!Wire.available()) {};
-//	uint8_t vha = Wire.receive();
-//	uint8_t vla = Wire.receive();
-//	Wire.endTransmission();
+// PWR_MGMT_1
 //
-//	value = vha << 8 | vla;
+void MPU6050_DeviceReset(uint8_t Reset) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_1, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(1 << MPU6050_PWR1_DEVICE_RESET_BIT);
+	tmp |= ((Reset & 0x1) << MPU6050_PWR1_DEVICE_RESET_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_1, 1, &tmp, 1, I2C_TIMEOUT );
+}
 
-//	uint8_t buff[2];
-//	sw_i2c_read_bulk( MPU6050_ADDRESS, reg, 2, buff );
+void MPU6050_SetSleepEnabled(uint8_t Enable) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_1, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(1 << MPU6050_PWR1_SLEEP_BIT);
+	tmp |= ((Enable & 0x1) << MPU6050_PWR1_SLEEP_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_1, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetCycleEnabled(uint8_t Enable) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_1, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(1 << MPU6050_PWR1_CYCLE_BIT);
+	tmp |= ((Enable & 0x1) << MPU6050_PWR1_CYCLE_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_1, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetTemperatureSensorDisbled(uint8_t Disable) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_1, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(1 << MPU6050_PWR1_TEMP_DIS_BIT);
+	tmp |= ((Disable & 0x1) << MPU6050_PWR1_TEMP_DIS_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_1, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetClockSource(uint8_t Source) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_1, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= 0xF8;
+	tmp |= (Source & 0x7);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_1, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
 //
-//	uint8_t vha = buff[0];
-//	uint8_t vla = buff[1];
-//	value = vha << 8 | vla;
-	sw_i2c_read_reg16( MPU6050_ADDRESS, reg, &value );
+//	PWR_MGMT_2
+//
+void MPU6050_SetLowPowerWakeUpFrequency(uint8_t Frequency) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_2, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= 0x3F;
+	tmp |= (Frequency & 0x3) << MPU6050_PWR2_LP_WAKE_CTRL_BIT;
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_2, 1, &tmp, 1, I2C_TIMEOUT );
+}
 
-	delay_us( MPU6050_DELAY );
+void MPU6050_AccelerometerAxisStandby(uint8_t XA_Stby, uint8_t YA_Stby, uint8_t ZA_Stby) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_2, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= 0xC7;
+	tmp |= ((XA_Stby & 0x1) << MPU6050_PWR2_STBY_XA_BIT)
+			| ((YA_Stby & 0x1) << MPU6050_PWR2_STBY_YA_BIT)
+			| ((ZA_Stby & 0x1) << MPU6050_PWR2_STBY_ZA_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_2, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_GyroscopeAxisStandby(uint8_t XG_Stby, uint8_t YG_Stby, uint8_t ZG_Stby) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_2, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= 0xF8;
+	tmp |= ((XG_Stby & 0x1) << MPU6050_PWR2_STBY_XG_BIT)
+			| ((YG_Stby & 0x1) << MPU6050_PWR2_STBY_YG_BIT)
+			| ((ZG_Stby & 0x1) << MPU6050_PWR2_STBY_ZG_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_PWR_MGMT_2, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+//
+//	Measurement scale configuration
+//
+void MPU6050_SetFullScaleGyroRange(uint8_t Range) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_GYRO_CONFIG, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= 0xE7;
+	tmp |= ((Range & 0x7) << 3);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_GYRO_CONFIG, 1, &tmp, 1, I2C_TIMEOUT );
+
+	switch (Range) {
+	case MPU6050_GYRO_FS_250:
+		Gyr_Scale = 0.007633;
+		break;
+	case MPU6050_GYRO_FS_500:
+		Gyr_Scale = 0.015267;
+		break;
+	case MPU6050_GYRO_FS_1000:
+		Gyr_Scale = 0.030487;
+		break;
+	case MPU6050_GYRO_FS_2000:
+		Gyr_Scale = 0.060975;
+		break;
+	default:
+		break;
+	}
+}
+
+void MPU6050_SetFullScaleAccelRange(uint8_t Range) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_ACCEL_CONFIG, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= 0xE7;
+	tmp |= ((Range & 0x7) << 3);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_ACCEL_CONFIG, 1, &tmp, 1, I2C_TIMEOUT );
+
+	switch (Range) {
+	case MPU6050_ACCEL_FS_2:
+		Acc_Scale = 0.000061;
+		break;
+	case MPU6050_ACCEL_FS_4:
+		Acc_Scale = 0.000122;
+		break;
+	case MPU6050_ACCEL_FS_8:
+		Acc_Scale = 0.000244;
+		break;
+	case MPU6050_ACCEL_FS_16:
+		Acc_Scale = 0.0004882;
+		break;
+	default:
+		break;
+	}
+}
+
+//
+// Reading data
+//
+int16_t MPU6050_GetTemperatureRAW(void) {
+	uint8_t tmp[2];
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_TEMP_OUT_H, 1, tmp, 2, I2C_TIMEOUT );
+	return (((int16_t) tmp[0]) << 8) | tmp[1];
+}
+
+float MPU6050_GetTemperatureCelsius(void) {
+	int16_t temp;
+
+	temp = MPU6050_GetTemperatureRAW();
+
+	return (float) temp / 340 + 36.53;
+}
+
+int16_t MPU6050_GetAccelerationXRAW(void) {
+	uint8_t tmp[2];
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_ACCEL_XOUT_H, 1, tmp, 2, I2C_TIMEOUT );
+	return (((int16_t) tmp[0]) << 8) | tmp[1];
+}
+
+int16_t MPU6050_GetAccelerationYRAW(void) {
+	uint8_t tmp[2];
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_ACCEL_YOUT_H, 1, tmp, 2, I2C_TIMEOUT );
+	return (((int16_t) tmp[0]) << 8) | tmp[1];
+}
+
+int16_t MPU6050_GetAccelerationZRAW(void) {
+	uint8_t tmp[2];
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_ACCEL_ZOUT_H, 1, tmp, 2, I2C_TIMEOUT );
+	return (((int16_t) tmp[0]) << 8) | tmp[1];
+}
+
+void MPU6050_GetAccelerometerRAW(int16_t *x, int16_t *y, int16_t *z) {
+	uint8_t tmp[6];
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_ACCEL_XOUT_H, 1, tmp, 6, I2C_TIMEOUT );
+
+	*x = (((int16_t) tmp[0]) << 8) | tmp[1];
+	*y = (((int16_t) tmp[2]) << 8) | tmp[3];
+	*z = (((int16_t) tmp[4]) << 8) | tmp[5];
+}
+
+void MPU6050_GetAccelerometerScaled(float *x, float *y, float *z) {
+	int16_t tmp_x, tmp_y, tmp_z;
+	MPU6050_GetAccelerometerRAW(&tmp_x, &tmp_y, &tmp_z);
+
+	*x = (float) tmp_x * Acc_Scale;
+	*y = (float) tmp_y * Acc_Scale;
+	*z = (float) tmp_z * Acc_Scale;
+}
+
+int16_t MPU6050_GetRotationXRAW(void) {
+	uint8_t tmp[2];
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_GYRO_XOUT_H, 1, tmp, 2, I2C_TIMEOUT );
+	return (((int16_t) tmp[0]) << 8) | tmp[1];
+}
+
+int16_t MPU6050_GetRotationYRAW(void) {
+	uint8_t tmp[2];
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_GYRO_YOUT_H, 1, tmp, 2, I2C_TIMEOUT );
+	return (((int16_t) tmp[0]) << 8) | tmp[1];
+}
+
+int16_t MPU6050_GetRotationZRAW(void) {
+	uint8_t tmp[2];
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_GYRO_ZOUT_H, 1, tmp, 2, I2C_TIMEOUT );
+	return (((int16_t) tmp[0]) << 8) | tmp[1];
+}
+
+void MPU6050_GetGyroscopeRAW(int16_t *x, int16_t *y, int16_t *z) {
+	uint8_t tmp[6];
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_GYRO_XOUT_H, 1, tmp, 6, I2C_TIMEOUT );
+
+	*x = (((int16_t) tmp[0]) << 8) | tmp[1];
+	*y = (((int16_t) tmp[2]) << 8) | tmp[3];
+	*z = (((int16_t) tmp[4]) << 8) | tmp[5];
+}
+
+void MPU6050_GetGyroscopeScaled(float *x, float *y, float *z) {
+	int16_t tmp_x, tmp_y, tmp_z;
+
+	MPU6050_GetGyroscopeRAW(&tmp_x, &tmp_y, &tmp_z);
+
+	*x = (float) tmp_x * Gyr_Scale;
+	*y = (float) tmp_y * Gyr_Scale;
+	*z = (float) tmp_z * Gyr_Scale;
+}
+
+void MPU6050_GetRollPitch( float *Roll, float *Pitch, float *Yaw ) {
+	float acc_x, acc_y, acc_z;
+	MPU6050_GetAccelerometerScaled( &acc_x, &acc_y, &acc_z );
+
+//	*Roll 	= 	atan2( acc_y, acc_z) * 180.0 / M_PI;
+	*Roll 	= 	atan2( acc_y, sqrt( acc_x*acc_x + acc_z*acc_z ) ) * (180.0/M_PI);
+//	*Pitch 	= -(atan2( acc_x, sqrt( acc_y*acc_y + acc_z*acc_z ) ) * 180.0 ) / M_PI;
+	*Pitch 	=   atan2( acc_x, sqrt( acc_y*acc_y + acc_z*acc_z ) ) * (180.0/M_PI);
+	*Yaw 	= 	atan2( acc_z, sqrt( acc_x*acc_x + acc_y*acc_y ) ) * (180.0/M_PI);
+}
+
+//
+//	Setting INT pin
+//
+void MPU6050_SetInterruptMode(uint8_t Mode) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_INT_PIN_CFG, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(1 << MPU6050_INTCFG_INT_LEVEL_BIT);
+	tmp |= ((Mode & 0x1) << MPU6050_INTCFG_INT_LEVEL_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_INT_PIN_CFG, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetInterruptDrive(uint8_t Drive) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_INT_PIN_CFG, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(1 << MPU6050_INTCFG_INT_OPEN_BIT);
+	tmp |= ((Drive & 0x1) << MPU6050_INTCFG_INT_OPEN_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_INT_PIN_CFG, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetInterruptLatch(uint8_t Latch) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_INT_PIN_CFG, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(1 << MPU6050_INTCFG_INT_RD_CLEAR_BIT);
+	tmp |= ((Latch & 0x1) << MPU6050_INTCFG_INT_RD_CLEAR_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_INT_PIN_CFG, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetInterruptLatchClear(uint8_t Clear) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_INT_PIN_CFG, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(1 << MPU6050_INTCFG_LATCH_INT_EN_BIT);
+	tmp |= ((Clear & 0x1) << MPU6050_INTCFG_LATCH_INT_EN_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_INT_PIN_CFG, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetIntEnableRegister(uint8_t Value) {
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_INT_ENABLE, 1, &Value, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetIntDataReadyEnabled(uint8_t Enable) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_INT_ENABLE, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(1 << MPU6050_INTERRUPT_DATA_RDY_BIT);
+	tmp |= ((Enable & 0x1) << MPU6050_INTERRUPT_DATA_RDY_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_INT_ENABLE, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+uint8_t MPU6050_GetIntStatusRegister(void) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_INT_STATUS, 1, &tmp, 1, I2C_TIMEOUT );
+	return tmp;
+}
+
+uint8_t MPU6050_GetDeviceID(void) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_WHO_AM_I, 1, &tmp, 1, I2C_TIMEOUT );
+	return tmp << 1;
+}
+
+//
+//	Motion functions - not included in documentation/register map
+//
+void MPU6050_SetDHPFMode(uint8_t Dhpf) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_ACCEL_CONFIG, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(0x07);
+	tmp |= Dhpf & 0x7;
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_ACCEL_CONFIG, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+uint8_t MPU6050_GetMotionStatusRegister(void) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_MOT_DETECT_STATUS, 1, &tmp, 1, I2C_TIMEOUT );
+	return tmp;
+}
+
+void MPU6050_SetIntZeroMotionEnabled(uint8_t Enable) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_INT_ENABLE, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(1 << MPU6050_INTERRUPT_ZMOT_BIT);
+	tmp |= ((Enable & 0x1) << MPU6050_INTERRUPT_ZMOT_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_INT_ENABLE, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetIntMotionEnabled(uint8_t Enable) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_INT_ENABLE, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(1 << MPU6050_INTERRUPT_MOT_BIT);
+	tmp |= ((Enable & 0x1) << MPU6050_INTERRUPT_MOT_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_INT_ENABLE, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetIntFreeFallEnabled(uint8_t Enable) {
+	uint8_t tmp;
+	HAL_I2C_Mem_Read( MPU6050_ADDRESS, MPU6050_RA_INT_ENABLE, 1, &tmp, 1, I2C_TIMEOUT );
+	tmp &= ~(1 << MPU6050_INTERRUPT_FF_BIT);
+	tmp |= ((Enable & 0x1) << MPU6050_INTERRUPT_FF_BIT);
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_INT_ENABLE, 1, &tmp, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetMotionDetectionThreshold(uint8_t Threshold) {
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_MOT_THR, 1, &Threshold, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetMotionDetectionDuration(uint8_t Duration) {
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_MOT_DUR, 1, &Duration, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetZeroMotionDetectionThreshold(uint8_t Threshold) {
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_ZRMOT_THR, 1, &Threshold, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetZeroMotionDetectionDuration(uint8_t Duration) {
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_ZRMOT_DUR, 1, &Duration, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetFreeFallDetectionThreshold(uint8_t Threshold) {
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_FF_THR, 1, &Threshold, 1, I2C_TIMEOUT );
+}
+
+void MPU6050_SetFreeFallDetectionDuration(uint8_t Duration) {
+	HAL_I2C_Mem_Write( MPU6050_ADDRESS, MPU6050_RA_FF_DUR, 1, &Duration, 1, I2C_TIMEOUT );
+}
+
+/********************************* GYRO *************************************/
+int16_t MPU6050__getGyroOffsetX(void) {
+	uint16_t value;
+	sw_i2c_read_reg16( MPU6050_ADDRESS, MPU6050_REG_GYRO_XOFFS_H, &value );
 	return (int16_t)value;
 }
-
-// Read register bit
-static bool	MPU6050__readRegisterBit( uint8_t reg, uint8_t pos ) {
-	uint8_t value;
-	value = MPU6050__readRegister8(reg);
-	return ((value >> pos) & 1);
+int16_t MPU6050__getGyroOffsetY(void) {
+	uint16_t value;
+	sw_i2c_read_reg16( MPU6050_ADDRESS, MPU6050_REG_GYRO_YOFFS_H, &value );
+	return (int16_t)value;
 }
-// Write register bit
-static void	MPU6050__writeRegisterBit( uint8_t reg, uint8_t pos, bool state ) {
-	uint8_t value;
-	value = MPU6050__readRegister8(reg);
+int16_t MPU6050__getGyroOffsetZ(void) {
+	uint16_t value;
+	sw_i2c_read_reg16( MPU6050_ADDRESS, MPU6050_REG_GYRO_ZOFFS_H, &value );
+	return (int16_t)value;
+}
+void MPU6050__setGyroOffsetX( int16_t offset ) {
+	sw_i2c_write_reg16( MPU6050_ADDRESS, MPU6050_REG_GYRO_XOFFS_H, offset );
+}
+void MPU6050__setGyroOffsetY( int16_t offset ) {
+	sw_i2c_write_reg16( MPU6050_ADDRESS, MPU6050_REG_GYRO_YOFFS_H, offset );
+}
+void MPU6050__setGyroOffsetZ( int16_t offset ) {
+	sw_i2c_write_reg16( MPU6050_ADDRESS, MPU6050_REG_GYRO_ZOFFS_H, offset );
+}
+/*****************************************************************************/
+/********************************* ACCEL *************************************/
+int16_t MPU6050__getAccelOffsetX(void) {
+	uint16_t value;
+	sw_i2c_read_reg16( MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOFFS_H, &value  );
+	return (int16_t)value;
+}
+int16_t MPU6050__getAccelOffsetY(void) {
+	uint16_t value;
+	sw_i2c_read_reg16( MPU6050_ADDRESS, MPU6050_REG_ACCEL_YOFFS_H, &value  );
+	return (int16_t)value;
+}
+int16_t MPU6050__getAccelOffsetZ(void) {
+	uint16_t value;
+	sw_i2c_read_reg16( MPU6050_ADDRESS, MPU6050_REG_ACCEL_ZOFFS_H, &value  );
+	return (int16_t)value;
+}
+void MPU6050__setAccelOffsetX( int16_t offset ) {
+	sw_i2c_write_reg16( MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOFFS_H, offset );
+}
+void MPU6050__setAccelOffsetY( int16_t offset ) {
+	sw_i2c_write_reg16( MPU6050_ADDRESS, MPU6050_REG_ACCEL_YOFFS_H, offset );
+}
+void MPU6050__setAccelOffsetZ( int16_t offset ) {
+	sw_i2c_write_reg16( MPU6050_ADDRESS, MPU6050_REG_ACCEL_ZOFFS_H, offset );
+}
+/*****************************************************************************/
 
-	if (state) {
-		value |= (1 << pos);
-	} else {
-		value &= ~(1 << pos);
+
+
+void sw_exti_init(void) {
+	gpio_pin_cfg( PORTA, PA3, gpio_mode_in_floating );
+
+#if defined STM32F3
+	RCC->APB2ENR 		|= RCC_APB2ENR_SYSCFGEN;
+	SYSCFG->EXTICR[0] 	|= SYSCFG_EXTICR1_EXTI3_PB;	// PB[3] pin
+	EXTI->FTSR 			|= EXTI_FTSR_TR3;			// Falling trigger event configuration bit of line 3
+	EXTI->RTSR 			|= EXTI_RTSR_TR3;			// Rising trigger event configuration bit of line 3
+	EXTI->IMR 			|= EXTI_IMR_MR3;			// Interrupt Mask on line 3
+	NVIC_EnableIRQ( EXTI3_IRQn );
+#elif defined STM32L4
+	RCC->APB2ENR 		|= RCC_APB2ENR_SYSCFGEN;
+	SYSCFG->EXTICR[0] 	|= SYSCFG_EXTICR1_EXTI3_PA;	// PA[3] pin
+	EXTI->FTSR1 		|= EXTI_FTSR1_FT3;			// Falling trigger event configuration bit of line 3
+	EXTI->RTSR1 		|= EXTI_RTSR1_RT3;			// Rising trigger event configuration bit of line 3
+	EXTI->IMR1 			|= EXTI_IMR1_IM3;			// Interrupt Mask on line 3
+	NVIC_EnableIRQ( EXTI3_IRQn );
+#endif
+}
+
+void EXTI3_IRQHandler(void) {
+	if (EXTI->PR1 & EXTI_PR1_PIF3) {		// Pending bit for line 3
+		EXTI->PR1 = EXTI_PR1_PIF3;
+
+		if ( sw_is_BUSY_flag_ready() == true ) return;
+
+		uint8_t interrupts = MPU6050_GetIntStatusRegister();
+		MPU6050_GetMotionStatusRegister();
+
+//		sprintf((char*) buffer, "Int status triggered: %X\n\n\r", interrupts);
+//		UART1_SendString((char*) buffer);
+
+		if (interrupts & (1 << MPU6050_INTERRUPT_FIFO_OFLOW_BIT)) {			// Bit 4 (0x10)
+//			sprintf((char*) buffer, "FIFO Overflow detected\n\r");
+//			UART1_SendString((char*) buffer);
+		}
+
+		if (interrupts & (1 << MPU6050_INTERRUPT_MOT_BIT))	{				// Bit 6 (0x40)
+//			sprintf((char*) buffer, "Motion detected\n\r");
+//			UART1_SendString((char*) buffer);
+		}
+
+		if (interrupts & (1 << MPU6050_INTERRUPT_ZMOT_BIT))	{				// Bit 5 (0x20)
+//			sprintf((char*) buffer, "Zero Motion detected\n\r");
+//			UART1_SendString((char*) buffer);
+		}
+
+		if (interrupts & (1 << MPU6050_INTERRUPT_FF_BIT)) {					// Bit 7 (0x80)
+//			sprintf((char*) buffer, "Freefall detected\n\r");
+//			UART1_SendString((char*) buffer);
+		}
+
 	}
-	MPU6050__writeRegister8(reg, value );
 }
-/****************************************************************************/
+struct Vector {
+	float XAxis;
+	float YAxis;
+	float ZAxis;
+};
+struct Vector	tg, dg, th; // ra, rg,
+static float	actualThreshold;
+static bool		useCalibrate = 0;
+void MPU6050__calibrateGyro( uint8_t samples );
+void MPU6050__setThreshold( uint8_t multiple );
 
 // Set threshold value
 void MPU6050__setThreshold( uint8_t multiple ) {
@@ -157,6 +550,11 @@ void MPU6050__setThreshold( uint8_t multiple ) {
 	actualThreshold = multiple;
 }
 
+// Get current threshold value
+uint8_t MPU6050__getThreshold(void) {
+	return actualThreshold;
+}
+
 // Calibrate algorithm
 void MPU6050__calibrateGyro( uint8_t samples ) {
 	// Set calibrate
@@ -170,17 +568,20 @@ void MPU6050__calibrateGyro( uint8_t samples ) {
 	float sigmaY = 0;
 	float sigmaZ = 0;
 
+	int16_t X = 0;
+	int16_t Y = 0;
+	int16_t Z = 0;
+
 	// Read n-samples
-	for ( uint8_t i = 0; i < samples; ++i) {
-		MPU6050__readRawGyro();
-		sumX += rg.XAxis;
-		sumY += rg.YAxis;
-		sumZ += rg.ZAxis;
-
-		sigmaX += rg.XAxis * rg.XAxis;
-		sigmaY += rg.YAxis * rg.YAxis;
-		sigmaZ += rg.ZAxis * rg.ZAxis;
-
+	for ( uint8_t i = 0; i < samples; ++i ) {
+		MPU6050_GetGyroscopeRAW( &X, &Y, &Z );
+//		MPU6050__readRawGyro();
+		sumX += X;
+		sumY += Y;
+		sumZ += Z;
+		sigmaX += X * X;
+		sigmaY += Y * Y;
+		sigmaZ += Z * Z;
 		delay_ms(5);
 	}
 
@@ -190,425 +591,159 @@ void MPU6050__calibrateGyro( uint8_t samples ) {
 	dg.ZAxis = sumZ / samples;
 
 	// Calculate threshold vectors
-	th.XAxis = sqrt((sigmaX / 50) - (dg.XAxis * dg.XAxis));
-	th.YAxis = sqrt((sigmaY / 50) - (dg.YAxis * dg.YAxis));
-	th.ZAxis = sqrt((sigmaZ / 50) - (dg.ZAxis * dg.ZAxis));
+	th.XAxis = sqrt( (sigmaX / 50) - (dg.XAxis * dg.XAxis) );
+	th.YAxis = sqrt( (sigmaY / 50) - (dg.YAxis * dg.YAxis) );
+	th.ZAxis = sqrt( (sigmaZ / 50) - (dg.ZAxis * dg.ZAxis) );
 
 	// If already set threshold, recalculate threshold vectors
-	if (actualThreshold > 0) {
+	if ( actualThreshold > 0 ) {
 		MPU6050__setThreshold( actualThreshold );
 	}
 }
 
 
-bool MPU6050__init( mpu6050_dps_t scale, mpu6050_range_t range ) {
-//	sw_i2c_simple_init();
+//
+//	Initialization
+//
+void MPU6050_Init(void) {
+	sw_exti_init();
 
-	// Reset calibrate values
-	dg.XAxis 		= 0;
-	dg.YAxis 		= 0;
-	dg.ZAxis 		= 0;
-	useCalibrate 	= false;
+	MPU6050_DeviceReset(1);
+	MPU6050_SetSleepEnabled(0);
+	MPU6050_SetClockSource(MPU6050_CLOCK_INTERNAL);
+	MPU6050_SetDlpf(MPU6050_DLPF_BW_20);
+	MPU6050_SetFullScaleGyroRange(MPU6050_GYRO_FS_250);
+	MPU6050_SetFullScaleAccelRange(MPU6050_ACCEL_FS_2);
 
-	// Reset threshold values
-	tg.XAxis 		= 0;
-	tg.YAxis 		= 0;
-	tg.ZAxis 		= 0;
-	actualThreshold = 0;
+//	MPU6050__setGyroOffsetX(0);
+//	MPU6050__setGyroOffsetY(0);
+//	MPU6050__setGyroOffsetZ(0);
+//	MPU6050__setAccelOffsetX(0);
+//	MPU6050__setAccelOffsetY(0);
+//	MPU6050__setAccelOffsetZ(0);
+}
 
-	// Check MPU6050 Who Am I Register
-	if ( MPU6050__fastRegister8( MPU6050_REG_WHO_AM_I ) != 0x68 ) {
-		return false;
+void sw_mpu6050_test_init(void) {
+	MPU6050_Init();
+
+	MPU6050_SetInterruptMode(MPU6050_INTMODE_ACTIVEHIGH);
+	MPU6050_SetInterruptDrive(MPU6050_INTDRV_PUSHPULL);
+	MPU6050_SetInterruptLatch(MPU6050_INTLATCH_WAITCLEAR);
+	MPU6050_SetInterruptLatchClear(MPU6050_INTCLEAR_STATUSREAD);
+
+	MPU6050_SetIntEnableRegister(0); // Disable all interrupts
+
+	// Enable Motion interrupts
+	MPU6050_SetDHPFMode(MPU6050_DHPF_5);
+
+	MPU6050_SetIntMotionEnabled(1);
+	MPU6050_SetIntZeroMotionEnabled(1);
+	MPU6050_SetIntFreeFallEnabled(1);
+
+	MPU6050_SetFreeFallDetectionDuration(2);
+	MPU6050_SetFreeFallDetectionThreshold(5);
+
+	MPU6050_SetMotionDetectionDuration(5);
+	MPU6050_SetMotionDetectionThreshold(2);
+
+	MPU6050_SetZeroMotionDetectionDuration(2);
+	MPU6050_SetZeroMotionDetectionThreshold(4);
+
+}
+
+
+
+static int16_t ax, ay, az, gx, gy, gz;
+
+static int mean_ax,mean_ay,mean_az,mean_gx,mean_gy,mean_gz;
+//,state = 0;
+static int ax_offset,ay_offset,az_offset,gx_offset,gy_offset,gz_offset;
+
+int buffersize 		= 1000;     //Amount of readings used to average, make it higher to get more precision but sketch will be slower  (default:1000)
+int acel_deadzone	= 8;     	//Acelerometer error allowed, make it lower to get more precision, but sketch may not converge  (default:8)
+int giro_deadzone	= 1;     	//Giro error allowed, make it lower to get more precision, but sketch may not converge  (default:1)
+
+void MPU6050_meansensors(void) {
+	long i = 0, buff_ax = 0, buff_ay = 0, buff_az = 0, buff_gx = 0, buff_gy = 0, buff_gz = 0;
+
+	while ( i < (buffersize + 101) ) {
+		// read raw accel/gyro measurements from device
+		MPU6050_GetGyroscopeRAW( &gx, &gy, &gz );
+		MPU6050_GetAccelerometerRAW( &ax, &ay, &az );
+
+		if ( i > 100 && i <= (buffersize + 100) ) { 	//First 100 measures are discarded
+			buff_ax = buff_ax + ax;
+			buff_ay = buff_ay + ay;
+			buff_az = buff_az + az;
+			buff_gx = buff_gx + gx;
+			buff_gy = buff_gy + gy;
+			buff_gz = buff_gz + gz;
+		}
+		if ( i == (buffersize + 100) ) {
+			mean_ax = buff_ax / buffersize;
+			mean_ay = buff_ay / buffersize;
+			mean_az = buff_az / buffersize;
+			mean_gx = buff_gx / buffersize;
+			mean_gy = buff_gy / buffersize;
+			mean_gz = buff_gz / buffersize;
+		}
+		i++;
+		delay_ms(2);									// Needed so we don't get repeated measures
 	}
-
-	// Set Clock Source
-	MPU6050__setClockSource( MPU6050_CLOCK_PLL_XGYRO );
-
-	// Set Scale & Range
-	MPU6050__setScale( scale );
-	MPU6050__setRange( range );
-
-	// Disable Sleep Mode
-	MPU6050__setSleepEnabled( false );
-
-	return true;
 }
 
-void MPU6050__setScale( mpu6050_dps_t scale ) {
-	uint8_t value;
+void MPU6050_calibration(void) {
+	ax_offset = -mean_ax / 8;
+	ay_offset = -mean_ay / 8;
+	az_offset = (16384 - mean_az) / 8;
 
-	switch (scale) {
-	case MPU6050_SCALE_250DPS:
-		dpsPerDigit = 0.007633f;
-		break;
-	case MPU6050_SCALE_500DPS:
-		dpsPerDigit = 0.015267f;
-		break;
-	case MPU6050_SCALE_1000DPS:
-		dpsPerDigit = 0.030487f;
-		break;
-	case MPU6050_SCALE_2000DPS:
-		dpsPerDigit = 0.060975f;
-		break;
-	default:
-		break;
+	gx_offset = -mean_gx / 4;
+	gy_offset = -mean_gy / 4;
+	gz_offset = -mean_gz / 4;
+	while (1) {
+		int ready = 0;
+		MPU6050__setAccelOffsetX( ax_offset );
+		MPU6050__setAccelOffsetY( ay_offset );
+		MPU6050__setAccelOffsetZ( az_offset );
+
+		MPU6050__setGyroOffsetX( gx_offset );
+		MPU6050__setGyroOffsetY( gy_offset );
+		MPU6050__setGyroOffsetZ( gz_offset );
+
+		MPU6050_meansensors();
+//		Serial.println("...");
+
+		if (abs(mean_ax) <= acel_deadzone)
+			ready++;
+		else
+			ax_offset = ax_offset - mean_ax / acel_deadzone;
+
+		if (abs(mean_ay) <= acel_deadzone)
+			ready++;
+		else
+			ay_offset = ay_offset - mean_ay / acel_deadzone;
+
+		if (abs(16384 - mean_az) <= acel_deadzone)
+			ready++;
+		else
+			az_offset = az_offset + (16384 - mean_az) / acel_deadzone;
+
+		if (abs(mean_gx) <= giro_deadzone)
+			ready++;
+		else
+			gx_offset = gx_offset - mean_gx / (giro_deadzone + 1);
+
+		if (abs(mean_gy) <= giro_deadzone)
+			ready++;
+		else
+			gy_offset = gy_offset - mean_gy / (giro_deadzone + 1);
+
+		if (abs(mean_gz) <= giro_deadzone)
+			ready++;
+		else
+			gz_offset = gz_offset - mean_gz / (giro_deadzone + 1);
+
+		if (ready == 6)
+			break;
 	}
-	value = MPU6050__readRegister8( MPU6050_REG_GYRO_CONFIG);
-	value &= 0b11100111;
-	value |= (scale << 3);
-	MPU6050__writeRegister8( MPU6050_REG_GYRO_CONFIG, value );
 }
-
-mpu6050_dps_t MPU6050__getScale(void) {
-	uint8_t value;
-	value = MPU6050__readRegister8( MPU6050_REG_GYRO_CONFIG);
-	value &= 0b00011000;
-	value >>= 3;
-	return ( mpu6050_dps_t) value;
-}
-
-void MPU6050__setRange( mpu6050_range_t range) {
-	uint8_t value;
-
-	switch (range) {
-	case MPU6050_RANGE_2G:
-		rangePerDigit = 0.000061f;
-		break;
-	case MPU6050_RANGE_4G:
-		rangePerDigit = 0.000122f;
-		break;
-	case MPU6050_RANGE_8G:
-		rangePerDigit = 0.000244f;
-		break;
-	case MPU6050_RANGE_16G:
-		rangePerDigit = 0.0004882f;
-		break;
-	default:
-		break;
-	}
-
-	value = MPU6050__readRegister8( MPU6050_REG_ACCEL_CONFIG);
-	value &= 0b11100111;
-	value |= (range << 3);
-	MPU6050__writeRegister8( MPU6050_REG_ACCEL_CONFIG, value );
-}
-
-mpu6050_range_t MPU6050__getRange(void) {
-	uint8_t value;
-	value = MPU6050__readRegister8( MPU6050_REG_ACCEL_CONFIG);
-	value &= 0b00011000;
-	value >>= 3;
-	return ( mpu6050_range_t) value;
-}
-
-void MPU6050__setDHPFMode( mpu6050_dhpf_t dhpf) {
-	uint8_t value;
-	value = MPU6050__readRegister8( MPU6050_REG_ACCEL_CONFIG);
-	value &= 0b11111000;
-	value |= dhpf;
-	MPU6050__writeRegister8( MPU6050_REG_ACCEL_CONFIG, value );
-}
-
-void MPU6050__setDLPFMode( mpu6050_dlpf_t dlpf) {
-	uint8_t value;
-	value = MPU6050__readRegister8( MPU6050_REG_CONFIG);
-	value &= 0b11111000;
-	value |= dlpf;
-	MPU6050__writeRegister8( MPU6050_REG_CONFIG, value );
-}
-
-void MPU6050__setClockSource( mpu6050_clockSource_t source) {
-	uint8_t value;
-	value = MPU6050__readRegister8( MPU6050_REG_PWR_MGMT_1);
-	value &= 0b11111000;
-	value |= source;
-	MPU6050__writeRegister8( MPU6050_REG_PWR_MGMT_1, value );
-}
-
-mpu6050_clockSource_t MPU6050__getClockSource(void) {
-	uint8_t value;
-	value = MPU6050__readRegister8( MPU6050_REG_PWR_MGMT_1);
-	value &= 0b00000111;
-	return ( mpu6050_clockSource_t) value;
-}
-
-bool MPU6050__getSleepEnabled(void) {
-	return MPU6050__readRegisterBit( MPU6050_REG_PWR_MGMT_1, 6);
-}
-
-void MPU6050__setSleepEnabled( bool state) {
-	MPU6050__writeRegisterBit( MPU6050_REG_PWR_MGMT_1, 6, state);
-}
-
-bool MPU6050__getIntZeroMotionEnabled(void) {
-	return MPU6050__readRegisterBit( MPU6050_REG_INT_ENABLE, 5);
-}
-
-void MPU6050__setIntZeroMotionEnabled( bool state) {
-	MPU6050__writeRegisterBit( MPU6050_REG_INT_ENABLE, 5, state);
-}
-
-bool MPU6050__getIntMotionEnabled(void) {
-	return MPU6050__readRegisterBit( MPU6050_REG_INT_ENABLE, 6);
-}
-
-void MPU6050__setIntMotionEnabled( bool state) {
-	MPU6050__writeRegisterBit( MPU6050_REG_INT_ENABLE, 6, state);
-}
-
-bool MPU6050__getIntFreeFallEnabled(void) {
-	return MPU6050__readRegisterBit( MPU6050_REG_INT_ENABLE, 7);
-}
-
-void MPU6050__setIntFreeFallEnabled( bool state) {
-	MPU6050__writeRegisterBit( MPU6050_REG_INT_ENABLE, 7, state);
-}
-
-uint8_t MPU6050__getMotionDetectionThreshold(void) {
-	return MPU6050__readRegister8( MPU6050_REG_MOT_THRESHOLD);
-}
-
-void MPU6050__setMotionDetectionThreshold( uint8_t threshold) {
-	MPU6050__writeRegister8( MPU6050_REG_MOT_THRESHOLD, threshold);
-}
-
-uint8_t MPU6050__getMotionDetectionDuration(void) {
-	return MPU6050__readRegister8( MPU6050_REG_MOT_DURATION);
-}
-
-void MPU6050__setMotionDetectionDuration( uint8_t duration) {
-	MPU6050__writeRegister8( MPU6050_REG_MOT_DURATION, duration);
-}
-
-uint8_t MPU6050__getZeroMotionDetectionThreshold(void) {
-	return MPU6050__readRegister8( MPU6050_REG_ZMOT_THRESHOLD);
-}
-
-void MPU6050__setZeroMotionDetectionThreshold( uint8_t threshold) {
-	MPU6050__writeRegister8( MPU6050_REG_ZMOT_THRESHOLD, threshold);
-}
-
-uint8_t MPU6050__getZeroMotionDetectionDuration(void) {
-	return MPU6050__readRegister8( MPU6050_REG_ZMOT_DURATION);
-}
-
-void MPU6050__setZeroMotionDetectionDuration( uint8_t duration) {
-	MPU6050__writeRegister8( MPU6050_REG_ZMOT_DURATION, duration);
-}
-
-uint8_t MPU6050__getFreeFallDetectionThreshold(void) {
-	return MPU6050__readRegister8( MPU6050_REG_FF_THRESHOLD);
-}
-
-void MPU6050__setFreeFallDetectionThreshold( uint8_t threshold) {
-	MPU6050__writeRegister8( MPU6050_REG_FF_THRESHOLD, threshold);
-}
-
-uint8_t MPU6050__getFreeFallDetectionDuration(void) {
-	return MPU6050__readRegister8( MPU6050_REG_FF_DURATION);
-}
-
-void MPU6050__setFreeFallDetectionDuration( uint8_t duration) {
-	MPU6050__writeRegister8( MPU6050_REG_FF_DURATION, duration);
-}
-
-bool MPU6050__getI2CMasterModeEnabled(void) {
-	return MPU6050__readRegisterBit( MPU6050_REG_USER_CTRL, 5);
-}
-
-void MPU6050__setI2CMasterModeEnabled( bool state) {
-	MPU6050__writeRegisterBit( MPU6050_REG_USER_CTRL, 5, state);
-}
-
-void MPU6050__setI2CBypassEnabled( bool state) {
-	return MPU6050__writeRegisterBit( MPU6050_REG_INT_PIN_CFG, 1, state);
-}
-
-bool MPU6050__getI2CBypassEnabled(void) {
-	return MPU6050__readRegisterBit( MPU6050_REG_INT_PIN_CFG, 1);
-}
-
-void MPU6050__setAccelPowerOnDelay( mpu6050_onDelay_t delay_ms) {
-	uint8_t value;
-	value = MPU6050__readRegister8( MPU6050_REG_MOT_DETECT_CTRL );
-	value &= 0b11001111;
-	value |= (delay_ms << 4);
-	MPU6050__writeRegister8( MPU6050_REG_MOT_DETECT_CTRL, value );
-}
-
-mpu6050_onDelay_t MPU6050__getAccelPowerOnDelay(void) {
-	uint8_t value;
-	value = MPU6050__readRegister8( MPU6050_REG_MOT_DETECT_CTRL);
-	value &= 0b00110000;
-	return ( mpu6050_onDelay_t) (value >> 4);
-}
-
-uint8_t MPU6050__getIntStatus(void) {
-	return MPU6050__readRegister8( MPU6050_REG_INT_STATUS);
-}
-
-struct Activites MPU6050__readActivites(void) {
-	uint8_t data = MPU6050__readRegister8( MPU6050_REG_INT_STATUS);
-
-	a.isOverflow = ((data >> 4) & 1);
-	a.isFreeFall = ((data >> 7) & 1);
-	a.isInactivity = ((data >> 5) & 1);
-	a.isActivity = ((data >> 6) & 1);
-	a.isDataReady = ((data >> 0) & 1);
-
-	data = MPU6050__readRegister8( MPU6050_REG_MOT_DETECT_STATUS);
-
-	a.isNegActivityOnX = ((data >> 7) & 1);
-	a.isPosActivityOnX = ((data >> 6) & 1);
-
-	a.isNegActivityOnY = ((data >> 5) & 1);
-	a.isPosActivityOnY = ((data >> 4) & 1);
-
-	a.isNegActivityOnZ = ((data >> 3) & 1);
-	a.isPosActivityOnZ = ((data >> 2) & 1);
-
-	return a;
-}
-
-struct Vector MPU6050__readRawAccel(void) {
-	uint8_t buffer[6];
-	sw_i2c_read_bulk( MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOUT_H, 6, buffer );
-
-	uint8_t xha = buffer[0];
-	uint8_t xla = buffer[1];
-	uint8_t yha = buffer[2];
-	uint8_t yla = buffer[3];
-	uint8_t zha = buffer[4];
-	uint8_t zla = buffer[5];
-
-	ra.XAxis = xha << 8 | xla;
-	ra.YAxis = yha << 8 | yla;
-	ra.ZAxis = zha << 8 | zla;
-
-	ra.XAxis = (float)(xha << 8 | xla);
-	ra.YAxis = (float)(yha << 8 | yla);
-	ra.ZAxis = (float)(zha << 8 | zla);
-
-	return ra;
-}
-
-struct Vector MPU6050__readNormalizeAccel(void) {
-	MPU6050__readRawAccel();
-
-	na.XAxis = ra.XAxis * rangePerDigit * 9.80665f;
-	na.YAxis = ra.YAxis * rangePerDigit * 9.80665f;
-	na.ZAxis = ra.ZAxis * rangePerDigit * 9.80665f;
-
-	return na;
-}
-
-struct Vector MPU6050__readScaledAccel(void) {
-	MPU6050__readRawAccel();
-
-	na.XAxis = ra.XAxis * rangePerDigit;
-	na.YAxis = ra.YAxis * rangePerDigit;
-	na.ZAxis = ra.ZAxis * rangePerDigit;
-
-	return na;
-}
-
-struct Vector MPU6050__readRawGyro(void) {
-	uint8_t buff[6];
-	sw_i2c_read_bulk( MPU6050_ADDRESS, MPU6050_REG_GYRO_XOUT_H, 6, buff );
-	uint8_t xha = buff[0];
-	uint8_t xla = buff[1];
-	uint8_t yha = buff[2];
-	uint8_t yla = buff[3];
-	uint8_t zha = buff[4];
-	uint8_t zla = buff[5];
-
-	rg.XAxis = xha << 8 | xla;
-	rg.YAxis = yha << 8 | yla;
-	rg.ZAxis = zha << 8 | zla;
-
-	return rg;
-}
-
-struct Vector MPU6050__readNormalizeGyro(void) {
-	MPU6050__readRawGyro();
-
-	if (useCalibrate) {
-		ng.XAxis = (rg.XAxis - dg.XAxis) * dpsPerDigit;
-		ng.YAxis = (rg.YAxis - dg.YAxis) * dpsPerDigit;
-		ng.ZAxis = (rg.ZAxis - dg.ZAxis) * dpsPerDigit;
-	} else {
-		ng.XAxis = rg.XAxis * dpsPerDigit;
-		ng.YAxis = rg.YAxis * dpsPerDigit;
-		ng.ZAxis = rg.ZAxis * dpsPerDigit;
-	}
-
-	if (actualThreshold) {
-		if (abs(ng.XAxis) < tg.XAxis)
-			ng.XAxis = 0;
-		if (abs(ng.YAxis) < tg.YAxis)
-			ng.YAxis = 0;
-		if (abs(ng.ZAxis) < tg.ZAxis)
-			ng.ZAxis = 0;
-	}
-	return ng;
-}
-
-float MPU6050__readTemperature(void) {
-	int16_t Temp;
-	Temp = MPU6050__readRegister16( MPU6050_REG_TEMP_OUT_H );
-	return (float) Temp / 340 + 36.53;
-}
-
-int16_t MPU6050__getGyroOffsetX(void) {
-	return MPU6050__readRegister16( MPU6050_REG_GYRO_XOFFS_H );
-}
-
-int16_t MPU6050__getGyroOffsetY(void) {
-	return MPU6050__readRegister16( MPU6050_REG_GYRO_YOFFS_H );
-}
-
-int16_t MPU6050__getGyroOffsetZ(void) {
-	return MPU6050__readRegister16( MPU6050_REG_GYRO_ZOFFS_H );
-}
-
-void MPU6050__setGyroOffsetX(int16_t offset ) {
-	MPU6050__writeRegister16( MPU6050_REG_GYRO_XOFFS_H, offset );
-}
-
-void MPU6050__setGyroOffsetY(int16_t offset ) {
-	MPU6050__writeRegister16( MPU6050_REG_GYRO_YOFFS_H, offset );
-}
-
-void MPU6050__setGyroOffsetZ(int16_t offset ) {
-	MPU6050__writeRegister16( MPU6050_REG_GYRO_ZOFFS_H, offset );
-}
-
-int16_t MPU6050__getAccelOffsetX(void) {
-	return MPU6050__readRegister16( MPU6050_REG_ACCEL_XOFFS_H );
-}
-
-int16_t MPU6050__getAccelOffsetY(void) {
-	return MPU6050__readRegister16( MPU6050_REG_ACCEL_YOFFS_H );
-}
-
-int16_t MPU6050__getAccelOffsetZ(void) {
-	return MPU6050__readRegister16( MPU6050_REG_ACCEL_ZOFFS_H );
-}
-
-void MPU6050__setAccelOffsetX(int16_t offset ) {
-	MPU6050__writeRegister16( MPU6050_REG_ACCEL_XOFFS_H, offset );
-}
-
-void MPU6050__setAccelOffsetY(int16_t offset ) {
-	MPU6050__writeRegister16( MPU6050_REG_ACCEL_YOFFS_H, offset );
-}
-
-void MPU6050__setAccelOffsetZ(int16_t offset ) {
-	MPU6050__writeRegister16( MPU6050_REG_ACCEL_ZOFFS_H, offset );
-}
-
-// Get current threshold value
-uint8_t MPU6050__getThreshold(void) {
-	return actualThreshold;
-}
-

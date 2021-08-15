@@ -12,15 +12,9 @@
 #define MICRO_SEC	2
 
 
-/****************************** Wyliczenia dla timera programowego **********************************/
-#define time_base_s(x)	(x*1000)	// Podstawiamy za 'x' ilość sekund, wynikiem będzie wartość soft timera
-#define time_base_ms(x)	(x)			// Podstawiamy za 'x' ilość milisekund, wynikiem będzie wartość soft timera
-#define time_base_us(x)	(x)			// Podstawiamy za 'x' ilość mikrosekund, wynikiem będzie wartość soft timera
-/****************************************************************************************************/
+extern uint32_t sw_softTimers_init( uint32_t timeBase_ms, uint32_t type );
+extern void nvic_priority(void);
 
-
-
-uint32_t sw_softTimers_init( uint32_t timeBase_ms, uint32_t type );
 
 extern volatile uint16_t softTimer2, softTimer5, adcTimer;
 extern volatile uint16_t pressTimer, debounceTimer, repeatTimer, adcCaptureTimer;

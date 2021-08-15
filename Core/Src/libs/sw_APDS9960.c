@@ -36,13 +36,13 @@
  * Raw I2C Reads and Writes
  ******************************************************************************/
 bool wireWriteDataByte(uint8_t reg, uint8_t data) {
-	return sw_i2c_write_reg( APDS9960_I2C_ADDR, reg, data);
+	return sw_i2c_write_reg8( APDS9960_I2C_ADDR, reg, data);
 }
 bool APDS9960__wireWriteDataBlock(uint8_t reg, uint8_t *val, unsigned int len) {
 	return sw_i2c_write_bulk( APDS9960_I2C_ADDR, reg, len, val );
 }
 bool wireReadDataByte(uint8_t reg, uint8_t *val) {
-	return sw_i2c_read_reg( APDS9960_I2C_ADDR, reg, val);
+	return sw_i2c_read_reg8( APDS9960_I2C_ADDR, reg, val);
 }
 bool wireReadDataBlock(uint8_t reg, uint8_t *buff, uint16_t len) {
 	return sw_i2c_read_bulk( APDS9960_I2C_ADDR, reg, len, buff);

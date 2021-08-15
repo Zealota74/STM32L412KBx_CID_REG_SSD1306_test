@@ -18,8 +18,9 @@
 
 
 #include "libs/sw_vcnl4010.h"
+#include "libs/keyboard.h"
 
-
+void keyboard(void);
 void SystemClock_Config(void);
 
 void pomiar( T_RESULTS *results );
@@ -36,6 +37,9 @@ T_STRING TextZ;
 T_STRING Temp;
 
 FONT_INFO CurrentFont;
+
+uint8_t zmienna1, zmienna2, zmienna3;
+void key_proc1(void);
 
 int main(void) {
 	SystemClock_Config();
@@ -60,6 +64,9 @@ int main(void) {
 	}
 	delay_ms(100);
 	mpu6050_test_init();
+	MPU6050__setThreshold(3);
+	MPU6050__calibrateGyro(50);
+//	MPU6050_calibration();
 
 //	I2CSTATUS status = sw_i2c_IsDeviceReady( ADDRESS_DEFAULT << 1, 3, 3 );
 //	sw_i2c_slave_test( ADDRESS_DEFAULT << 1 );
@@ -67,51 +74,99 @@ int main(void) {
 	softTimer3 = 200;
 	register_measure_callback( pomiar );
 
-	paj7620_init( fps_120 );
+//	paj7620_init( fps_120 );
 	delay_ms(100);
 
-    register_gesture_callback( my_gesture, NULL );
+//    register_gesture_callback( my_gesture, NULL );
+	gpio_pin_cfg( PORTB, PB4, gpio_mode_in_PU );
+	register_keyboard_callback(keyboard);
 
 	softTimer3 = 500;
 	while(1) {
+		key_proc1();
+
+
 //		SW_VCNL4010_MEASURE_EVENT();
 //		PAJ7620_EVENT();
 
 		if (softTimer2 == 0) {
-			softTimer2 = 500;
-			sw_led_xor();
+			softTimer2 = 200;
+//			sw_led_xor();
 
-			mpu6050_test_loop();
+//			mpu6050_test_loop();
 //			VL53L0X__loop();
 		}
 		if ( !softTimer3 ) {
 			sw_ssd1306_display();
-			softTimer3 = 300;
+			softTimer3 = 100;
 		}
 	}
 }
 
+void key_proc1(void) {
+	if ( StateKey == 1 ) {
+		zmienna1++;
+		StateKey = 0;
+//		sw_led_blink();
+		TEXT_display_float( 0, 0,  zmienna1, &TextX );
+	} else
+	if ( StateKey == 2 ) {
+		zmienna2++;
+		StateKey = 0;
+		TEXT_display_float( 0, 16,  zmienna2, &TextY );
+	} else
+	if ( StateKey == 3 ) {
+		zmienna2++;
+		StateKey = 0;
+		TEXT_display_float( 0, 32,  zmienna3, &TextZ );
+	}
+}
+
+
+void keyboard(void) {
+	static uint8_t counter;
+	if ( keyboard_ptr()->pressType == SHORT ) {
+//		sw_led_on();
+//		sw_led_start_blinking( 2, 100 );
+		TEXT_display_float( 0, 0,  ++counter,  	&TextX );
+	} else
+	if ( keyboard_ptr()->pressType == LONG ) {
+//		sw_led_off();
+//		sw_led_start_blinking( 5, 200 );
+		TEXT_display_float( 0, 0,  --counter,  	&TextX );
+	} else
+	if ( keyboard_ptr()->pressType == REPEAT ) {
+		sw_led_xor();
+	}
+}
+
+
+
+#define MEDIAL	20
 static float32_t srednia1( float32_t wartosc ) {
-	static float32_t bufor1[5] 		= {0,0,0,0,0};
+	static float32_t bufor1[MEDIAL] 		= {0};
 	static uint16_t kolejny_pomiar = 0;
 	bufor1[ kolejny_pomiar++ ] = wartosc;
-	if (kolejny_pomiar == 5) {
+	if (kolejny_pomiar == MEDIAL) {
 		kolejny_pomiar = 0;
 	}
 
 	float32_t wynik = 0;
-	for ( uint8_t i=0; i<5; i++ ) {
+	for ( uint8_t i=0; i<MEDIAL; i++ ) {
 		wynik = wynik + bufor1[i];
 	}
-	wynik = (float32_t)wynik / 5;
+	wynik = (float32_t)wynik / MEDIAL;
 	return wynik;
 }
 bool mpu6050_test_init(void) {
-	if( false == MPU6050__init( MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G ) ) {
-		return false;
-	}
+//	if( false == MPU6050__init( MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G ) ) {
+//		return false;
+//	}
 //	MPU6050__calibrateGyro( 5 );	// Kalibracja żyroskopu
 //	MPU6050__setThreshold( 3 );		// Ustawienie czułości
+
+	sw_mpu6050_test_init();
+
 	return true;
 }
 void mpu6050_test_loop(void) {
@@ -144,16 +199,30 @@ void mpu6050_test_loop(void) {
 //	TEXT_display_float( 0, 32, yaw,	  &TextZ );
 //	delay_ms( (timeStep*1000) - (millis() - timer));
 
-	struct Vector normAccel = MPU6050__readNormalizeAccel();
+//	struct Vector normAccel = MPU6050__readNormalizeAccel();
+//
+//	int pitch = -(atan2(normAccel.XAxis, sqrt(normAccel.YAxis*normAccel.YAxis + normAccel.ZAxis*normAccel.ZAxis))*180.0) / M_PI;
+//	int roll  =  (atan2(normAccel.YAxis, normAccel.ZAxis)*180.0) / M_PI;
+//	TEXT_display_number( 0, 0,  pitch, &TextX );
+//	TEXT_display_number( 0, 16, roll, &TextY );
+//	float temp = MPU6050__readTemperature();
+//	TEXT_display_float( 0, 48, temp, &Temp );
 
-	int pitch = -(atan2(normAccel.XAxis, sqrt(normAccel.YAxis*normAccel.YAxis + normAccel.ZAxis*normAccel.ZAxis))*180.0) / M_PI;
-	int roll  =  (atan2(normAccel.YAxis, normAccel.ZAxis)*180.0) / M_PI;
-	TEXT_display_number( 0, 0,  pitch, &TextX );
-	TEXT_display_number( 0, 16, roll, &TextY );
+//	int16_t acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z;
+	float ax, ay, az, gx, gy, gz, temperature, roll, pitch, yaw;
+	MPU6050_GetAccelerometerScaled( &ax, &ay, &az );
+	MPU6050_GetGyroscopeScaled	  ( &gx, &gy, &gz );
+	temperature = MPU6050_GetTemperatureCelsius();
 
+	MPU6050_GetRollPitch( &roll, &pitch, &yaw );
+//	T_STRING TextX;
+	temperature = srednia1(roll);
+	TEXT_display_float( 0, 0,  roll,  	&TextX );
+	TEXT_display_float( 0, 16, pitch, 	&TextY );
+	TEXT_display_float( 0, 32, yaw,		&TextZ );
 
-	float temp = MPU6050__readTemperature();
-	TEXT_display_float( 0, 48, temp, &Temp );
+//	TEXT_display_float( 0, 48, temperature, &Temp );
+
 }
 
 // ------------ Definicje funkcji --------------
