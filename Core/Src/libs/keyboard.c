@@ -63,6 +63,7 @@ void key_proc(void) {
 	if ( StateKey == 1 ) {
 		zmienna1++;
 		StateKey = 0;
+
 //		sw_led_blink();
 //		TEXT_display_float( 0, 0,  zmienna2, &TextX );
 //		sw_ssd1306_display();
