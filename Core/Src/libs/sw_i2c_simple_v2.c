@@ -307,7 +307,7 @@ void sw_i2c_simple_init(void) {
 	gpio_pin_HI ( hI2Cx->scl_port,  hI2Cx->scl_pin );
 	gpio_pin_HI ( hI2Cx->sda_port,  hI2Cx->sda_pin );
 
-	hI2Cx->I2C->TIMINGR  = (uint32_t)I2C_TIMING_80MHz_100KHz;
+	hI2Cx->I2C->TIMINGR  = (uint32_t)I2C_TIMING_80MHz_400KHz;
 	SET_BIT( hI2Cx->I2C->CR1, I2C_CR1_PE );
 }
 

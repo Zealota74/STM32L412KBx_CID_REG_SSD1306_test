@@ -321,11 +321,9 @@ static void graphic_puts_float_RAM( volatile T_DISPLAY *buffer, T_STRING *string
 	uint8_t i 	= 1;						// First character is sign
 	itoa( dec, text_char + i , 10 );
 
-	while ( *ptr_char ) {					// Find number of integer digits
-		i++;
-		ptr_char++;
-	} i--;
-	text_char[ i++ ] = '.';					// Place '.' character';
+	while ( *(ptr_char + i++) ) {}			// Find number of integer digits
+
+	text_char[ i - 1 ] = '.';				// Place '.' character';
 	data = data - (float32_t)dec;			// Fractional part of a number
 
 	do {									// Find first zeros after the dot

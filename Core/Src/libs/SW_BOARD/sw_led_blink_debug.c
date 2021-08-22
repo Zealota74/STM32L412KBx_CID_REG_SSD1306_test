@@ -62,6 +62,8 @@ void sw_led_debug_init( void ) {
 
 #ifdef	DEBUG_PIN0
 	gpio_pin_cfg( DEBUG_PORT0, DEBUG_PIN0, gpio_mode_output_PP_HS );
+	gpio_pin_HI( DEBUG_PORT0, DEBUG_PIN0);
+
 #endif
 #ifdef	DEBUG_PIN1
 	gpio_pin_cfg( DEBUG_PORT1, DEBUG_PIN1, gpio_mode_output_PP_HS );

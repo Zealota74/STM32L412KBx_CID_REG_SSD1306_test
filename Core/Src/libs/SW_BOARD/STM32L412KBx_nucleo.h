@@ -12,7 +12,7 @@
 #define LED_PIN		PB3
 
 #define DEBUG_PORT0	PORTA
-#define DEBUG_PIN0	PA0
+#define DEBUG_PIN0	PA3
 #define DEBUG_PORT1	PORTA
 #define DEBUG_PIN1	PA1
 

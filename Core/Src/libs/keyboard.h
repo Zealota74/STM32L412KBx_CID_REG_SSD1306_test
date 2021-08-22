@@ -10,7 +10,13 @@
 
 /**** Definicja struktury ******/
 typedef struct {
-	uint8_t pressType;
+	bool shortPRESS;
+	bool mediumPRESS;
+	bool longPRESS;
+	bool keyREPEAT;
+	bool doublePRESS;
+	uint32_t timeFallFall;
+	uint32_t timeFallRise;
 	uint8_t keysDecoded[1];				// Obecnie możliwość wykrycia tylko 1 przycisku
 } T_KEYB;
 
@@ -27,12 +33,18 @@ static inline uint8_t sw_get_single_key( void ) {
 }
 /*****************************************************************************************/
 enum {
-	IDLE=0, SHORT=1, LONG=2, REPEAT=3
+	IDLE=0, SHORT=1, MEDIUM=2, LONG=3, VERY_LONG=4, REPEAT=5
 };
 enum {
 	action_idle, action_debounce, action_check, action_react, action_repeat
 };
 
+enum {
+	stateFALL = 1, stateRISE = 2, stateLOW = 3, stateHIGH = 4
+};
+enum {
+	keyPRESSED = (1 << 0), keyRELEASED = (1 << 1), keyFULL = keyPRESSED | keyRELEASED
+};
 
 
 /************************** Another ****************************/

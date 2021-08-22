@@ -154,3 +154,14 @@ void RCC_gpio_init( void ) {
 inline void gpio_pin_XOR( GPIO_TypeDef * const port, T_GPIO_PIN pin ) {
 	port->ODR ^= pin;
 }
+
+void gpio_pin_IMPULSES( GPIO_TypeDef * const port, T_GPIO_PIN pin, uint8_t num ) {
+	num = 2*num + 2;
+	while ( --num ) {
+		if ( num%2 ) {
+			port->BRR = pin;
+		} else {
+			port->BSRR = pin;
+		}
+	}
+}

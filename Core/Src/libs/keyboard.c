@@ -13,15 +13,164 @@
 
 #include "keyboard.h"
 
-/************************** Another ****************************/
+
+static T_KEYB 	keyboard;
+static uint8_t	keyAction 	  = action_idle;
+static uint8_t	repeatCounter = 0;
+static bool 	keyEvent 	  = false;
+
+
+static INLINE void machine_state_reset(void) {
+	keyboard.shortPRESS		= false;
+	keyboard.mediumPRESS	= false;
+	keyboard.longPRESS		= false;
+
+	keyboard.keyREPEAT		= false;
+	keyboard.doublePRESS 	= false;
+
+	keyboard.timeFallFall	= 0;
+	keyboard.timeFallRise	= 0;
+
+	keyboard.keysDecoded[0] = 0;
+}
+static INLINE uint8_t analyze_slope( uint8_t state, uint8_t lastState ) {
+//	static bool 	stateDoubleFall	= false;
+//	static uint32_t	timeFallFall 	= 0;
+	static uint32_t	timeFallRise 	= 0;
+//	static uint8_t 	edgeCount		= 0;
+
+	if 		(state == keyPRESSED  && lastState == keyRELEASED) state = stateFALL;
+	else if (state == keyRELEASED && lastState == keyPRESSED)  state = stateRISE;
+	else if (state == keyRELEASED && lastState == keyRELEASED) state = stateHIGH;
+	else if (state == keyPRESSED  && lastState == keyPRESSED)  state = stateLOW;
+
+	switch ( state ) {
+		case stateFALL:
+			timeFallRise = millis();			// Check time between Fall and Rise
+		break;
+
+		case stateRISE:
+			timeFallRise 			= millis() - timeFallRise;
+			keyboard.timeFallRise	= timeFallRise;
+		break;
+		default: break;
+	}
+
+	return state;
+}
+
+static bool keyPressed( void ) {
+	keyEvent = false;
+	static uint8_t speedPressCounter = 0;
+
+	volatile static uint8_t lastState = keyRELEASED;
+	uint8_t pressKeyCheck = sw_get_single_key() ? keyPRESSED : keyRELEASED;
+	uint8_t slope 		  = analyze_slope( pressKeyCheck, lastState );
+
+	if ( slope == stateFALL ) {							// Fall edge detected
+		if (keyAction == action_idle) {
+			keyAction 	  = action_debounce;
+			debounceTimer = 10;							// 20 ms na debouncing
+			gpio_pin_IMPULSES(DEBUG_PORT0, DEBUG_PIN0, 1);
+		}
+	} else if ( slope == stateLOW ) {					// State on LOW detected
+		switch ( keyAction ) {
+			case action_debounce:
+				if ( debounceTimer == 0 ) {
+					keyAction 	  = action_check;
+					debounceTimer = 400;				// 400 ms na sprawdzenie czy to krótkie
+					gpio_pin_IMPULSES(DEBUG_PORT0, DEBUG_PIN0, 2);
+				} break;
+			case action_check:
+				if ( debounceTimer == 0 ) {
+					keyAction 	  = action_repeat;		// (start funkcji REPEAT)
+					debounceTimer = 800;				// 500 ms na sprawdzenie czy klawisz nadal wciśnięty
+					repeatCounter = 0;
+					gpio_pin_IMPULSES(DEBUG_PORT0, DEBUG_PIN0, 3);
+				} break;
+			case action_repeat:
+				if ( debounceTimer == 0 ) {
+					debounceTimer		= 100;			// 100 ms - czas powtarzania funkcji REPEAT
+					keyboard.keyREPEAT	= true;			// (start funkcji REPEAT)
+					keyEvent 			= true;
+					repeatCounter++;
+					gpio_pin_IMPULSES(DEBUG_PORT0, DEBUG_PIN0, 4);
+				} break;
+			default:
+			break;
+		}
+	} else if ( slope == stateRISE ) {										// slope == stateRISE
+		if ( keyAction == action_check || keyAction == action_repeat ) {
+			debounceTimer = 20;												// 10 ms for RISE debounce
+			gpio_pin_IMPULSES(DEBUG_PORT0, DEBUG_PIN0, 5);
+		}
+	} else if ( slope == stateHIGH ) {										// slope == stateHIGH
+		switch ( keyAction ) {
+
+			case action_check:
+				if ( debounceTimer == 0 ) {
+					if (keyboard.timeFallRise > 120 ) {
+						keyboard.shortPRESS = true;		// Zwracamy SHORT, gdyż zwolniliśmy klawisz
+						keyEvent 			= true;
+						speedPressCounter = 0;
+					} else {
+						speedPressCounter++;
+					}
+					keyAction = action_idle;
+					gpio_pin_IMPULSES(DEBUG_PORT0, DEBUG_PIN0, 6);
+				}										// zanim upłynął czas 500 ms (LONG)
+			break;
+			case action_repeat:
+				if ( repeatCounter == 0 && debounceTimer == 0) {
+					keyboard.mediumPRESS = true;
+					keyEvent 			 = true;
+					keyAction			 = action_idle;
+					gpio_pin_IMPULSES(DEBUG_PORT0, DEBUG_PIN0, 7);
+					keyAction = action_idle;
+				}
+			break;
+			default:
+//				if ( keyAction = action_idle; )
+				gpio_pin_IMPULSES(DEBUG_PORT0, DEBUG_PIN0, 8);
+				keyAction = action_idle;
+			break;
+		}
+
+	}
+	lastState = pressKeyCheck;
+	return keyEvent;
+}
+/********************************************************************************************/
+
+T_KEYB * keyboard_ptr(void) {
+	return &keyboard;
+}
+
+static void ( *keyboard_callback )( void );
+void register_keyboard_callback( void (*callback)( void) ) {
+	keyboard_callback = callback;
+}
+
+void SW_KEYBOARD_EVENT( void ) {
+	if ( keyPressed() == true) {
+
+		if( keyboard_callback ) {
+			keyboard_callback();
+			machine_state_reset();
+		}
+	}
+}
+
+
+
+
+
+
+
+
+/************************** Another ****************************
 volatile uint8_t StateKey = 0;
 
-enum {
-	stateFALL = 1, stateRISE = 2
-};
-enum {
-	keyPRESSED = (1 << 0), keyRELEASED = (1 << 1), keyFULL = keyPRESSED | keyRELEASED
-};
 void key_handler( void ) {
 	if (softTimer2 > 0) {
 		return;
@@ -81,92 +230,5 @@ void key_proc(void) {
 //		sw_ssd1306_display();
 	}
 }
-/***************************************************************/
-
-
-
-static T_KEYB keyboard;
-static uint8_t keyAction = action_idle;
-
-static INLINE void machine_state_reset(void) {
-	keyboard.pressType		= IDLE;
-	keyboard.keysDecoded[0] = 0;
-}
-
-static INLINE uint8_t analyze_slope( uint8_t state, uint8_t lastState ) {
-	if ( state == keyPRESSED  && lastState == keyRELEASED )
-		return stateFALL;
-	else
-	if ( state == keyRELEASED && lastState == keyPRESSED )
-		return stateRISE;
-	return 0;
-}
-
-static void keyPressed( void ) {
-	volatile static uint8_t lastState = keyRELEASED;
-
-	uint8_t pressKeyCheck = sw_get_single_key() ? keyPRESSED : keyRELEASED;
-	uint8_t slope 		  = analyze_slope( pressKeyCheck, lastState );
-
-	if ( pressKeyCheck == keyPRESSED ) {
-
-		switch ( keyAction ) {
-			case action_idle:
-				keyAction 		= action_debounce;
-				debounceTimer 	= 50;					// 50 ms na debouncing
-				return;
-			case action_debounce:
-				if ( debounceTimer == 0 ) {
-					keyAction 		= action_check;
-					debounceTimer	= 400;				// 1000 ms na sprawdzenie czy to krótkie
-				}										// czy długie przyciśnięcie
-				return;
-			case action_check:
-				if ( debounceTimer == 0 ) {
-					debounceTimer 		= 1000;				// 300 ms na sprawdzenie czy klawisz nadal wciśnięty
-					keyAction 			= action_repeat;	// (start funkcji REPEAT)
-					keyboard.pressType	= LONG;
-				}
-				return;
-			case action_repeat:
-				if ( debounceTimer == 0 ) {
-					debounceTimer		= 100;			// 100 ms - czas powtarzania funkcji REPEAT
-					keyboard.pressType	= REPEAT;		// (start funkcji REPEAT)
-				}
-				return;
-			default:
-				break;
-		}
-	} else {
-		if ( keyAction == action_check ) {
-			if (debounceTimer) {
-				keyAction 			= action_idle;
-				keyboard.pressType	= SHORT;		// Zwracamy SHORT, gdyż zwolniliśmy klawisz
-			}										// zanim upłynął czas 500 ms (LONG)
-		} else {
-			keyAction = action_idle;
-		}
-	}
-	lastState = pressKeyCheck;
-}
-/********************************************************************************************/
-
-T_KEYB * keyboard_ptr(void) {
-	return &keyboard;
-}
-
-static void ( *keyboard_callback )( void );
-void register_keyboard_callback( void (*callback)( void) ) {
-	keyboard_callback = callback;
-}
-
-void SW_KEYBOARD_EVENT( void ) {
-	keyPressed();
-	if ( keyboard.pressType != 0 ) {
-		if( keyboard_callback ) {
-			keyboard_callback();
-			machine_state_reset();
-		}
-	}
-}
+***************************************************************/
 

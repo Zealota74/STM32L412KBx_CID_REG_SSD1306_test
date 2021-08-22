@@ -63,10 +63,9 @@ int main(void) {
 //		glcd_puts( 0, 0, "ERROR", 1 );
 	}
 	delay_ms(100);
-	mpu6050_test_init();
-	MPU6050__setThreshold(3);
-	MPU6050__calibrateGyro(50);
-//	MPU6050_calibration();
+//	mpu6050_test_init();
+//	MPU6050__setThreshold(3);
+//	MPU6050__calibrateGyro(50);
 
 //	I2CSTATUS status = sw_i2c_IsDeviceReady( ADDRESS_DEFAULT << 1, 3, 3 );
 //	sw_i2c_slave_test( ADDRESS_DEFAULT << 1 );
@@ -83,8 +82,6 @@ int main(void) {
 
 	softTimer3 = 500;
 	while(1) {
-		key_proc1();
-
 
 //		SW_VCNL4010_MEASURE_EVENT();
 //		PAJ7620_EVENT();
@@ -97,45 +94,35 @@ int main(void) {
 //			VL53L0X__loop();
 		}
 		if ( !softTimer3 ) {
-			sw_ssd1306_display();
 			softTimer3 = 100;
 		}
 	}
 }
 
-void key_proc1(void) {
-	if ( StateKey == 1 ) {
-		zmienna1++;
-		StateKey = 0;
-//		sw_led_blink();
-		TEXT_display_float( 0, 0,  zmienna1, &TextX );
-	} else
-	if ( StateKey == 2 ) {
-		zmienna2++;
-		StateKey = 0;
-		TEXT_display_float( 0, 16,  zmienna2, &TextY );
-	} else
-	if ( StateKey == 3 ) {
-		zmienna2++;
-		StateKey = 0;
-		TEXT_display_float( 0, 32,  zmienna3, &TextZ );
-	}
-}
-
 
 void keyboard(void) {
-	static uint8_t counter;
-	if ( keyboard_ptr()->pressType == SHORT ) {
+	static int8_t counter, counter2;
+	if ( keyboard_ptr()->shortPRESS == true ) {
 //		sw_led_on();
 //		sw_led_start_blinking( 2, 100 );
 		TEXT_display_float( 0, 0,  ++counter,  	&TextX );
+		sw_ssd1306_display();
 	} else
-	if ( keyboard_ptr()->pressType == LONG ) {
+	if ( keyboard_ptr()->mediumPRESS == true ) {
 //		sw_led_off();
 //		sw_led_start_blinking( 5, 200 );
 		TEXT_display_float( 0, 0,  --counter,  	&TextX );
+		sw_ssd1306_display();
 	} else
-	if ( keyboard_ptr()->pressType == REPEAT ) {
+	if ( keyboard_ptr()->doublePRESS == true ) {
+//		sw_led_off();
+//		sw_led_start_blinking( 5, 200 );
+		TEXT_display_float( 0, 16,  --counter2,  	&TextY );
+		sw_ssd1306_display();
+	} else
+	if ( keyboard_ptr()->keyREPEAT == true ) {
+		TEXT_display_float( 0, 0,  ++counter,  	&TextX );
+		sw_ssd1306_display();
 		sw_led_xor();
 	}
 }
