@@ -18,7 +18,7 @@ static INLINE void sw_i2c_autoend_off(void) { hI2Cx->I2C->CR2 &= ~I2C_CR2_AUTOEN
 static INLINE void sw_i2c_nBytes( uint8_t nBytes ) {
 	MODIFY_REG( I2C1->CR2, I2C_CR2_NBYTES, nBytes << I2C_CR2_NBYTES_Pos );
 }
-static INLINE void sw_i2c_read_dir (void) { hI2Cx->I2C->CR2 |= I2C_CR2_RD_WRN; }
+static INLINE void sw_i2c_read_dir (void) { hI2Cx->I2C->CR2 |=  I2C_CR2_RD_WRN; }
 static INLINE void sw_i2c_write_dir(void) { hI2Cx->I2C->CR2 &= ~I2C_CR2_RD_WRN; }
 
 static INLINE I2CSTATUS sw_i2c_isTXIS_error(void) {
@@ -296,7 +296,7 @@ void sw_i2c_simple_init(void) {
 	RCC->APB1ENR  |= RCC_APB1ENR_I2C1EN;
 #endif
 	SET_BIT	 ( hI2Cx->I2C->CR1, I2C_CR1_SWRST );	// Software reset
-	delay_ms(100);
+//	delay_ms(100);
 	CLEAR_BIT( hI2Cx->I2C->CR1, I2C_CR1_SWRST );
 
 //	CLEAR_BIT( hI2Cx->I2C->CR1, I2C_CR1_PE );
@@ -307,7 +307,7 @@ void sw_i2c_simple_init(void) {
 	gpio_pin_HI ( hI2Cx->scl_port,  hI2Cx->scl_pin );
 	gpio_pin_HI ( hI2Cx->sda_port,  hI2Cx->sda_pin );
 
-	hI2Cx->I2C->TIMINGR  = (uint32_t)I2C_TIMING_80MHz_400KHz;
+	hI2Cx->I2C->TIMINGR  = (uint32_t)I2C_TIMING_80MHz_100KHz;
 	SET_BIT( hI2Cx->I2C->CR1, I2C_CR1_PE );
 }
 

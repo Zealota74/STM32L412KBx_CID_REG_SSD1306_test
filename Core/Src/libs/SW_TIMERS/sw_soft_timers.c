@@ -100,8 +100,10 @@ void SysTick_Handler( void ) {
 
 	sw_led_blinking();
 //	SW_IR_DECODED_EVENT();
-	SW_KEYBOARD_EVENT();
-
+	if (showMenuTimer == 0) {
+		showMenuTimer = 10;
+		SW_KEYBOARD_EVENT();
+	}
 //	key_handler();
 }
 /******************************************************************************/

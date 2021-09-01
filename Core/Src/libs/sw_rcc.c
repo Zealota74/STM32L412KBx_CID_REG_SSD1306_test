@@ -132,6 +132,100 @@ void SystemClock_Config(void) {
 	rcc_SystemClockMux_switch( RCC_CFGR_SW_PLL );
 
 	SystemCoreClockUpdate();
-	SysTick_Config( SystemCoreClock / 1000 );	// Systick on 1 ms
 }
 /**********************************************************************/
+
+
+
+/*
+ * https://www.elektroda.pl/rtvforum/viewtopic.php?p=19577038#19577038
+ */
+/**
+ * Entering STOP2 power save mode. In this mode all clocks except LSI and LSE are disabled. StaticRAM content
+ * is preserved, optionally GPIO and few other peripherals can be kept power up depending on configuration
+ */
+void pwr_save_enter_stop2(void) {
+
+	// clear previous low power mode selection
+	PWR->CR1 &= (0xFFFFFFFF ^ PWR_CR1_LPMS_Msk);
+
+	// select STOP2
+	PWR->CR1 |= PWR_CR1_LPMS_STOP2;
+
+	// enable write access to RTC registers by writing two magic words
+//	RTC->WPR = 0xCA;
+//	RTC->WPR = 0x53;
+//
+//	// save an information that STOP2 mode has been applied
+//	RTC->BKP4R |= IN_STOP2_MODE;
+
+	SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
+
+	DBGMCU->CR &= (0xFFFFFFFF ^ (DBGMCU_CR_DBG_SLEEP_Msk | DBGMCU_CR_DBG_STOP_Msk | DBGMCU_CR_DBG_STANDBY_Msk));
+
+	asm("sev");
+	asm("wfi");
+}
+
+void system_clock_configure_auto_wakeup_l4(uint16_t seconds) {
+
+	// enable access to backup domain
+	PWR->CR1 |= PWR_CR1_DBP;
+
+	// enable write access to RTC registers by writing two magic words
+	RTC->WPR = 0xCA;
+	RTC->WPR = 0x53;
+
+	// disable wakeup timer
+	RTC->CR &= (0xFFFFFFFF ^ RTC_CR_WUTE);
+
+	// wait for wakeup timer to disable
+//	while((RTC->ISR & RTC_ISR_WUTWF) == 0);
+	while((RTC->ICSR & RTC_ICSR_WUTWF) == 0);
+
+	// clear wakeup flag
+//	RTC->ISR &= (0xFFFFFFFF ^ RTC_ISR_WUTF_Msk);
+	RTC->ICSR &= (0xFFFFFFFF ^ RTC_ICSR_WUTWF_Msk);
+
+	// set auto wakeup timer
+	RTC->WUTR = seconds;
+
+	// start wakeup timer once again
+	RTC->CR |= RTC_CR_WUTE;
+
+	// enabling wakeup interrupt
+	RTC->CR |= RTC_CR_WUTIE;
+
+	// enable 20th EXTI Line (RTC wakeup timer)
+	EXTI->IMR1 |= EXTI_IMR1_IM20;
+
+	// set 20th EXTI line to rising trigger
+	EXTI->RTSR1 |= EXTI_RTSR1_RT20;
+
+	// by enabling this all pending interrupt will wake up cpu from low-power mode, even from those disabled in NVIC
+	SCB->SCR |= SCB_SCR_SEVONPEND_Msk;
+
+	// enable wakeup interrupt
+	NVIC_EnableIRQ(RTC_WKUP_IRQn);
+}
+
+
+#ifdef STM32L471xx
+void RTC_WKUP_IRQHandler(void) {
+
+	// clear pending interrupt
+	NVIC_ClearPendingIRQ(RTC_WKUP_IRQn);
+
+	RTC->ISR &= (0xFFFFFFFF ^ RTC_ISR_WUTF_Msk);
+
+	EXTI->PR1 |= EXTI_PR1_PIF20;
+
+	system_clock_configure_l4();
+
+	led_flip_led1_upper();
+
+	led_flip_led2_bottom();
+
+	led_control_led1_upper(true);
+}
+#endif

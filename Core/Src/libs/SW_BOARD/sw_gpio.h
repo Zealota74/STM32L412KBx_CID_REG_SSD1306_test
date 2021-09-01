@@ -20,8 +20,7 @@ extern void gpio_pin_XOR( GPIO_TypeDef * const port, T_GPIO_PIN pin );
 extern void RCC_gpio_init( void );
 extern void gpio_pin_IMPULSES( GPIO_TypeDef * const port, T_GPIO_PIN pin, uint8_t num );
 
-static inline uint8_t gpio_pin_READ( GPIO_TypeDef * const port, T_GPIO_PIN pin ) {
-//	if ( (port->IDR & pin) ) return 1;
+static INLINE uint8_t gpio_pin_READ( GPIO_TypeDef * const port, T_GPIO_PIN pin ) {
 	if ( !(port->IDR & pin) ) return 1;
 	else return 0;
 }

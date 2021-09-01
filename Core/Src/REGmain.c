@@ -14,6 +14,7 @@
 
 #include "libs/MK_GESTURE_PAJ7620/mk_paj7620.h"
 #include "libs/sw_mpu6050.h"
+#include "libs/sw_ADXL345.h"
 #include "libs/VL53L0X.h"
 
 
@@ -44,11 +45,17 @@ void key_proc1(void);
 int main(void) {
 	SystemClock_Config();
 	RCC_gpio_init();
-	sw_led_debug_init();
 	sw_softTimers_init( 1, MICRO_SEC );
 
 	sw_i2c_simple_init();
+	sw_led_debug_init();
+	sw_keyboard_init();
+
+	SysTick_Config( SystemCoreClock / 1000 );	// Systick on 1 ms
+
 	delay_ms(100);
+
+	ADXL345__init();
 
 	sw_ssd1306_init();
 	delay_ms(100);
@@ -56,12 +63,6 @@ int main(void) {
 //	VL53L0X__setup();
 	delay_ms(100);
 
-	if ( vcnl4010_init() ) {
-//		glcd_puts( 0, 0, "VCNL4010 initialized", 1 );
-
-	} else {
-//		glcd_puts( 0, 0, "ERROR", 1 );
-	}
 	delay_ms(100);
 //	mpu6050_test_init();
 //	MPU6050__setThreshold(3);
@@ -77,8 +78,7 @@ int main(void) {
 	delay_ms(100);
 
 //    register_gesture_callback( my_gesture, NULL );
-	gpio_pin_cfg( PORTB, PB4, gpio_mode_in_PU );
-	register_keyboard_callback(keyboard);
+
 
 	softTimer3 = 500;
 	while(1) {
@@ -100,33 +100,36 @@ int main(void) {
 }
 
 
-void keyboard(void) {
-	static int8_t counter, counter2;
-	if ( keyboard_ptr()->shortPRESS == true ) {
+void key1_decoded(void) {
+	static int8_t counter1, counter2, counter3;
+	if ( keyboard_ptr()->keyEvent == SHORT_PRESS ) {
 //		sw_led_on();
 //		sw_led_start_blinking( 2, 100 );
-		TEXT_display_float( 0, 0,  ++counter,  	&TextX );
+		TEXT_display_float( 0, 0,  ++counter1,  	&TextX );
 		sw_ssd1306_display();
 	} else
-	if ( keyboard_ptr()->mediumPRESS == true ) {
-//		sw_led_off();
-//		sw_led_start_blinking( 5, 200 );
-		TEXT_display_float( 0, 0,  --counter,  	&TextX );
+	if ( keyboard_ptr()->keyEvent == MEDIUM_PRESS ) {
+		TEXT_display_float( 0, 16,  ++counter2,  	&TextY );
 		sw_ssd1306_display();
 	} else
-	if ( keyboard_ptr()->doublePRESS == true ) {
-//		sw_led_off();
-//		sw_led_start_blinking( 5, 200 );
-		TEXT_display_float( 0, 16,  --counter2,  	&TextY );
+	if ( keyboard_ptr()->keyEvent == DOUBLE_PRESS ) {
+		TEXT_display_float( 0, 32,  ++counter3,  	&TextZ );
 		sw_ssd1306_display();
 	} else
-	if ( keyboard_ptr()->keyREPEAT == true ) {
-		TEXT_display_float( 0, 0,  ++counter,  	&TextX );
+	if ( keyboard_ptr()->keyEvent == VLONG_PRESS ) {
+		counter3 = 0; counter2 = 0; counter1 = 0;
+		TEXT_display_float( 0,  0,  counter1,  	&TextX );
+		TEXT_display_float( 0, 16,  counter2,  	&TextY );
+		TEXT_display_float( 0, 32,  counter3,  	&TextZ );
+		sw_led_start_blinking( 3, 100 );
 		sw_ssd1306_display();
-		sw_led_xor();
+	} else
+	if ( keyboard_ptr()->keyEvent == KEY_REPEAT ) {
+		TEXT_display_float( 0, 0,  ++counter1,  	&TextX );
+		sw_ssd1306_display();
 	}
 }
-
+void key2_decoded(void) { sw_led_xor(); }
 
 
 #define MEDIAL	20
