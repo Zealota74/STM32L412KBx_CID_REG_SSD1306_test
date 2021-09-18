@@ -5,7 +5,7 @@
 #include "libs/SW_BOARD/sw_gpio.h"
 #include "libs/SW_BOARD/sw_led_blink_debug.h"
 #include "libs/SW_TIMERS/sw_soft_timers.h"
-#include "libs/sw_i2c_simple_v2.h"
+#include "libs/SW_STM_PERIPHS/sw_i2c_simple_v2.h"
 
 #include "libs/SW_GRAPHICS/SW_SSD1306/framebuffer.h"
 #include "libs/SW_GRAPHICS/displays.h"

@@ -78,7 +78,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="Src/libs/MK_GESTURE_PAJ7620|Src/libs/SW_GRAPHICS/menu.c|Src/libs/SW_SSD1306|Src/libs/sw_i2c_simple.c|Src/libs/MK_GLCD|Src/libs/SW_GRAPHICS/sw_spectrum_lib.c|Src/libs/max44009.c|Src/libs/i2c.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
+						<entry excluding="Src/libs/fatfs|Src/libs/MK_GESTURE_PAJ7620|Src/libs/SW_GRAPHICS/menu.c|Src/libs/SW_SSD1306|Src/libs/sw_i2c_simple.c|Src/libs/MK_GLCD|Src/libs/SW_GRAPHICS/sw_spectrum_lib.c|Src/libs/max44009.c|Src/libs/i2c.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
 					</sourceEntries>
 				</configuration>
@@ -168,7 +168,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="Src/libs/MK_GESTURE_PAJ7620|Src/libs/SW_GRAPHICS/menu.c|Src/libs/SW_SSD1306|Src/libs/sw_i2c_simple.c|Src/libs/MK_GLCD|Src/libs/SW_GRAPHICS/sw_spectrum_lib.c|Src/libs/max44009.c|Src/libs/i2c.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
+						<entry excluding="Src/libs/fatfs|Src/libs/MK_GESTURE_PAJ7620|Src/libs/SW_GRAPHICS/menu.c|Src/libs/SW_SSD1306|Src/libs/sw_i2c_simple.c|Src/libs/MK_GLCD|Src/libs/SW_GRAPHICS/sw_spectrum_lib.c|Src/libs/max44009.c|Src/libs/i2c.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
 					</sourceEntries>
 				</configuration>

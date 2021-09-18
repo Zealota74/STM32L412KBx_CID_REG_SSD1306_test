@@ -10,7 +10,7 @@
 
 #include "SW_TIMERS/sw_soft_timers.h"
 
-#include "sw_i2c_simple_v2.h"
+#include "SW_STM_PERIPHS/sw_i2c_simple_v2.h"
 #include "sw_vcnl4010.h"
 
 

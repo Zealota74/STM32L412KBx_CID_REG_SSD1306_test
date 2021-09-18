@@ -32,7 +32,7 @@ static uint16_t timeFall2Rise 	 = 0;	// Time: first fall and last rise
 
 static INLINE void machine_state_reset(void) {
 	keyboard.keyEvent = NO_EVENT;
-	keyboard.keyCoded = 0;
+	keyboard.keyCoded = NO_KEY;
 }
 
 /***************************** Detect slopes ****************************/

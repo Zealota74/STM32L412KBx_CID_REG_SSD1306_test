@@ -9,6 +9,10 @@
 #define SRC_LIBS_SW_I2C_SIMPLE_H_
 
 /******************************* Definition *********************************/
+#define I2C_DMA
+//#define I2C_IRQ
+//
+
 #define DUMMY 						0
 #define I2C_CR2_NBYTE_MAX			255
 #define I2C_REPEATED_START			1
@@ -67,54 +71,48 @@ static const I2C_t i2c2 	= { I2C2, gpio_mode_AF4_OD_HS, PORTA, PORTA, PA10, PA9 
 #else
 
 #endif
-static const I2C_t * hI2Cx = &i2c1Alt1;
+
 /******************************************************************************/
 
-/*************************** FLAG functions ***********************************/
-static INLINE bool sw_is_TC_flag_ready(void) {
-	if( hI2Cx->I2C->ISR & I2C_ISR_TC ) return true; else  return false;
-}
-static INLINE bool sw_is_TCR_flag_ready(void) {
-	if( hI2Cx->I2C->ISR & I2C_ISR_TCR ) return true; else  return false;
-}
-static INLINE bool sw_is_TXIS_flag_ready(void) {
-	if( hI2Cx->I2C->ISR & I2C_ISR_TXIS ) return true; else  return false;
-}
-static INLINE bool sw_is_NACK_flag_ready(void) {
-	if( hI2Cx->I2C->ISR & I2C_ISR_NACKF ) return true; else  return false;
-}
-static INLINE bool sw_is_RXNE_flag_ready(void) {
-	if( hI2Cx->I2C->ISR & I2C_ISR_RXNE ) return true; else  return false;
-}
+extern const I2C_t * sw_i2c_get_handle(void);
+
 static INLINE bool sw_is_BUSY_flag_ready(void) {
-	if( hI2Cx->I2C->ISR & I2C_ISR_BUSY ) return true; else  return false;
+	if( sw_i2c_get_handle()->I2C->ISR & I2C_ISR_BUSY ) return true; else  return false;
 }
-static INLINE void sw_i2c_set_7bitAddr( uint8_t devAddr ) {
-	MODIFY_REG( hI2Cx->I2C->CR2, I2C_CR2_SADD, devAddr << I2C_CR2_SADD_Pos );
-}
-/******************************************************************************/
 
 /**************************** Really base functions ***************************/
 static INLINE I2CSTATUS sw_i2c_start( void ) {
-	hI2Cx->I2C->CR2 |= I2C_CR2_START;
+	sw_i2c_get_handle()->I2C->CR2 |= I2C_CR2_START;
 	return I2C_Ok;
 }
 static INLINE void 		sw_i2c_stop(void)  {
-	hI2Cx->I2C->CR2 |= I2C_CR2_STOP;
-	while ( (hI2Cx->I2C->ISR & I2C_ISR_STOPF) == 0) {}
+	sw_i2c_get_handle()->I2C->CR2 |= I2C_CR2_STOP;
+	while ( (sw_i2c_get_handle()->I2C->ISR & I2C_ISR_STOPF) == 0) {}
 }
 static INLINE I2CSTATUS sw_i2c_write( uint8_t data ) {
-	hI2Cx->I2C->TXDR = data;								// First write byte
-	while ( ( hI2Cx->I2C->ISR & I2C_ISR_TXE ) == 0 ) { }	// then check the flag - buffer empty
+	sw_i2c_get_handle()->I2C->TXDR = data;								// First write byte
+	while ( ( sw_i2c_get_handle()->I2C->ISR & I2C_ISR_TXE ) == 0 ) { }	// then check the flag - buffer empty
 	return I2C_Ok;
 }
 static INLINE uint8_t	sw_i2c_read( uint8_t dummy ) {
-	while ( ( hI2Cx->I2C->ISR & I2C_ISR_RXNE ) == 0 ) {}	// then check the flag
-	return ( hI2Cx->I2C->RXDR & 0xFF );
+	while ( ( sw_i2c_get_handle()->I2C->ISR & I2C_ISR_RXNE ) == 0 ) {}	// then check the flag
+	return ( sw_i2c_get_handle()->I2C->RXDR & 0xFF );
+}
+static INLINE void sw_i2c_set_7bitAddr( uint8_t devAddr ) {
+	MODIFY_REG( sw_i2c_get_handle()->I2C->CR2, I2C_CR2_SADD, devAddr << I2C_CR2_SADD_Pos );
 }
 static INLINE void	sw_i2c_set_bitrate( uint32_t bitrate) {
 
 }
+
+static INLINE void sw_i2c_autoend_on(void)  { sw_i2c_get_handle()->I2C->CR2 |=  I2C_CR2_AUTOEND; }
+static INLINE void sw_i2c_autoend_off(void) { sw_i2c_get_handle()->I2C->CR2 &= ~I2C_CR2_AUTOEND; }
+static INLINE void sw_i2c_nBytes( uint8_t nBytes ) {
+	MODIFY_REG( I2C1->CR2, I2C_CR2_NBYTES, nBytes << I2C_CR2_NBYTES_Pos );
+}
+static INLINE void sw_i2c_read_dir (void) { sw_i2c_get_handle()->I2C->CR2 |=  I2C_CR2_RD_WRN; }
+static INLINE void sw_i2c_write_dir(void) { sw_i2c_get_handle()->I2C->CR2 &= ~I2C_CR2_RD_WRN; }
+
 /******************************************************************************/
 
 /********************************* Extern functions ***************************/

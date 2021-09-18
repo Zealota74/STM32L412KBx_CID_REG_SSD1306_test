@@ -6,20 +6,32 @@
  */
 #include "sw_mcu_conf.h"
 
-#include "SW_BOARD/sw_gpio.h"
-#include "SW_BOARD/sw_led_blink_debug.h"
-#include "SW_TIMERS/sw_soft_timers.h"
+#include "../SW_BOARD/sw_gpio.h"
+#include "../SW_BOARD/sw_led_blink_debug.h"
+#include "../SW_TIMERS/sw_soft_timers.h"
 #include "sw_i2c_simple_v2.h"
 
+static const I2C_t * hI2Cx = &i2c1Alt1;
 
 /****************************** Base static functions ********************************/
-//static INLINE void sw_i2c_autoend_on(void)  { hI2Cx->I2C->CR2 |=  I2C_CR2_AUTOEND; }
-static INLINE void sw_i2c_autoend_off(void) { hI2Cx->I2C->CR2 &= ~I2C_CR2_AUTOEND; }
-static INLINE void sw_i2c_nBytes( uint8_t nBytes ) {
-	MODIFY_REG( I2C1->CR2, I2C_CR2_NBYTES, nBytes << I2C_CR2_NBYTES_Pos );
+
+/*************************** FLAG functions ***********************************/
+static INLINE bool sw_is_TC_flag_ready(void) {
+	if( hI2Cx->I2C->ISR & I2C_ISR_TC ) return true; else  return false;
 }
-static INLINE void sw_i2c_read_dir (void) { hI2Cx->I2C->CR2 |=  I2C_CR2_RD_WRN; }
-static INLINE void sw_i2c_write_dir(void) { hI2Cx->I2C->CR2 &= ~I2C_CR2_RD_WRN; }
+static INLINE bool sw_is_TCR_flag_ready(void) {
+	if( hI2Cx->I2C->ISR & I2C_ISR_TCR ) return true; else  return false;
+}
+static INLINE bool sw_is_TXIS_flag_ready(void) {
+	if( hI2Cx->I2C->ISR & I2C_ISR_TXIS ) return true; else  return false;
+}
+static INLINE bool sw_is_NACK_flag_ready(void) {
+	if( hI2Cx->I2C->ISR & I2C_ISR_NACKF ) return true; else  return false;
+}
+static INLINE bool sw_is_RXNE_flag_ready(void) {
+	if( hI2Cx->I2C->ISR & I2C_ISR_RXNE ) return true; else  return false;
+}
+/******************************************************************************/
 
 static INLINE I2CSTATUS sw_i2c_isTXIS_error(void) {
 	whileTimer = 2;
@@ -48,6 +60,9 @@ static INLINE I2CSTATUS sw_i2c_isRXNE_error(void) {
 	}
 	return I2C_Ok;
 }
+
+
+
 
 static I2CSTATUS sw_i2c_write_buff( uint16_t nBytes, const uint8_t * pBuff ) {
 	for ( uint16_t i=0; i< nBytes; i++ ) {
@@ -309,7 +324,15 @@ void sw_i2c_simple_init(void) {
 
 	hI2Cx->I2C->TIMINGR  = (uint32_t)I2C_TIMING_80MHz_100KHz;
 	SET_BIT( hI2Cx->I2C->CR1, I2C_CR1_PE );
+
+	hI2Cx->I2C->CR1 |= I2C_CR1_ERRIE;				// Peripheral enable
+//	NVIC_EnableIRQ( I2C1_ER_IRQn );
+
 }
+
+/********************************************************************************/
+const I2C_t * sw_i2c_get_handle(void) { return hI2Cx; };
+/********************************************************************************/
 
 /******************************** Some tests functions ******************************/
 I2CSTATUS sw_i2c_slave_test( uint8_t devAddr, uint32_t trials, uint16_t delayMS ) {

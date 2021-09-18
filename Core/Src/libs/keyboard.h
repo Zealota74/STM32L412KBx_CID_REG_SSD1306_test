@@ -21,6 +21,7 @@
 #define VLONG_TIME_CNT		20		// 20 * 100 ms = 2s
 #define MULTI_PRESS_TIME	500
 #define EDGE_COUNTER		4		// 2 fall and 2 rise edges
+#define NO_KEY				0
 
 typedef enum {
 	NO_EVENT 	= 0, SHORT_PRESS  = 1, MEDIUM_PRESS = 2, LONG_PRESS = 3,
