@@ -8,8 +8,8 @@
 
 #include "../SW_BOARD/sw_gpio.h"
 
-#include "sw_i2c_simple_v2.h"
-#include "sw_i2c_dma.h"
+#include "sw_i2c_base_v2.h"
+#include "sw_i2c_irq_dma.h"
 
 
 /************************************ PRIVATE VARIABLES ******************************************/

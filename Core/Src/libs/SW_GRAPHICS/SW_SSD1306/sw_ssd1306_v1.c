@@ -22,7 +22,7 @@
 #include "../../SW_STM_PERIPHS/sw_dma.h"
 //#include "../../SW_STM_PERIPHS/sw_tim_v2.h"
 #include "../../SW_TIMERS/sw_soft_timers.h"
-#include "../../SW_STM_PERIPHS/sw_i2c_simple_v2.h"
+#include "../../SW_STM_PERIPHS/sw_i2c_base_v2.h"
 
 #include "framebuffer.h"
 #include "../colors.h"

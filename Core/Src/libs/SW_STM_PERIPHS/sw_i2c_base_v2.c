@@ -9,7 +9,7 @@
 #include "../SW_BOARD/sw_gpio.h"
 #include "../SW_BOARD/sw_led_blink_debug.h"
 #include "../SW_TIMERS/sw_soft_timers.h"
-#include "sw_i2c_simple_v2.h"
+#include "sw_i2c_base_v2.h"
 
 static const I2C_t * hI2Cx = &i2c1Alt1;
 
@@ -305,7 +305,7 @@ void sw_i2c_simple_init(void) {
 	RCC->APB1RSTR1 |=  RCC_APB1RSTR1_I2C1RST;
 	RCC->APB1RSTR1 &= ~RCC_APB1RSTR1_I2C1RST;
 	RCC->APB1ENR1  |= RCC_APB1ENR1_I2C1EN;
-#elif defined STM32F3
+#elif defined STM32F3 || defined STM32F0
 	RCC->APB1RSTR |=  RCC_APB1RSTR_I2C1RST;
 	RCC->APB1RSTR &= ~RCC_APB1RSTR_I2C1RST;
 	RCC->APB1ENR  |= RCC_APB1ENR_I2C1EN;

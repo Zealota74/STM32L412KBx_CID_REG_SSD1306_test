@@ -45,6 +45,14 @@
 #define I2C_TIMING_80MHz_1000KHz	0x00300F33
 
 #define I2C_SLAVE_ADDR				0x0D
+
+typedef enum {
+	I2C_Ok = 0, I2C_Error = 1, I2C_Nack = 2, I2C_RXNE_Er = 3
+} I2CSTATUS;
+typedef enum {
+	I2C_Ready = true, I2C_NotReady = false
+} I2C_READY;
+
 /*******************************************************************************/
 
 /********************************* Base variable *******************************/
@@ -54,12 +62,6 @@ typedef struct {
 	GPIO_TypeDef *  scl_port, * sda_port;
 	T_GPIO_PIN 	    scl_pin, 	sda_pin;
 } I2C_t;
-typedef enum {
-	I2C_Ok = 0, I2C_Error = 1, I2C_Nack = 2, I2C_RXNE_Er = 3
-} I2CSTATUS;
-typedef enum {
-	I2C_Ready = true, I2C_NotReady = false
-} I2C_READY;
 
 #if defined STM32F303xC || defined STM32L412xx
 static const I2C_t i2c1 	= { I2C1, gpio_mode_AF4_OD_HS, PORTA, PORTA, PA15, PA14 };

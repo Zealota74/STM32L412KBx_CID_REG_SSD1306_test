@@ -6,12 +6,12 @@
  */
 
 
-#include "../../libs/SW_GRAPHICS/fonts_pl.h"
+#include "fonts_pl.h"
 
 
 
 #ifdef UTF_8
-const wchar_t utf_8Code[18] = {
+const uint16_t utf_8Code[18] = {
 	0xC59A,  /*Ś, */
 	0xC5B9,  /*Ź, */
 	0xC59B,  /*ś, */
@@ -31,6 +31,29 @@ const wchar_t utf_8Code[18] = {
 	0xC584,  /*ń, */
 	0xC3B3,  /*ó, */
 };
+/*****************************************************************/
+uint8_t polish_letters_UTF8( CHAR * codeChar ) {
+	if ( *codeChar < 128 ) {
+		return ASCII;
+	}
+	uint8_t tmp = ASCII;
+	uint16_t a = (uint16_t)( *codeChar << 8);		// High nibble
+			 a = (uint16_t)a | *(codeChar +1);		// Low  nibble
+
+	for ( uint8_t i = 0; i < PL_CHARACTERS_COUNT; i++ ) {
+
+			if ( *codeChar >= 0x81 && *codeChar <= 0xBC ) {
+				return UTF8_LOW;
+			}
+			uint16_t b = (uint16_t)( utf_8Code[i] );
+			if ( a == b ) {
+				return i;
+			}
+	}
+	return tmp;
+}
+/*****************************************************************/
+
 #endif
 
 #ifdef UNICODE
@@ -54,6 +77,19 @@ const wchar_t uniCode[18] = {
 	0x0144,  /*ń, */
 	0x00F3,  /*ó, */
 };
+uint8_t polish_letters_UNICODE( CHAR * codeChar ) {
+	uint8_t tmp=ASCII;
+
+	for ( uint8_t i = 0; i < PL_CHARACTERS_COUNT; i++ ) {
+		if ( codePage == UNICODE ) {
+			if ( codeChar == uniCode[i]) {
+				return i;
+			}
+		}
+	}
+	return tmp;
+}
+
 #endif
 
 #ifdef WIN1250
@@ -77,6 +113,16 @@ const char win1250Code[] = {
 	0xF1,  /*ń, */
 	0xF3,  /*ó, */
 };
+uint8_t polish_letters_WIN1250( CHAR * codeChar ) {
+	uint8_t tmp = ASCII;
+
+	for ( uint8_t i = 0; i < PL_CHARACTERS_COUNT; i++ ) {
+		if ( codeChar == win1250Code[i] )
+			return i;
+	}
+	return tmp;
+}
+
 #endif
 
 #ifdef ISO8859_2
@@ -100,6 +146,16 @@ const char iso8859_2Code[] = {
 	0xF1,  /*ń, */
 	0xF3,  /*ó, */
 };
+
+uint8_t polish_letters_ISO8859_2( uint8_t codePage, CHAR * codeChar ) {
+	uint8_t tmp = ASCII;
+
+	for ( uint8_t i = 0; i < PL_CHARACTERS_COUNT; i++ ) {
+		if ( codeChar == iso8859_2Code[i] )
+			return i;
+	}
+	return tmp;
+}
 #endif
 
 #ifdef CP852
@@ -123,53 +179,14 @@ const char cp852Code[] = {
 	0xE4,  /*ń, */
 	0xA2,  /*ó, */
 };
-#endif
-
-/***** Zwraca numer znaku w tablicy ************************/
-uint8_t polish_letters(uint8_t codePage, wchar_t codeChar) {
-
-	uint8_t i;
+uint8_t polish_letters_CP852( uint8_t codePage, CHAR * codeChar ) {
 	uint8_t tmp=ASCII;
 
-	for (i=0; i<18; i++) {
-
-#ifdef UNICODE
-		if (codePage == UNICODE) {
-			if ( codeChar == uniCode[i]) {
-				return i;
-			}
-		}
-#endif
-
-#ifdef UTF_8
-		if (codePage == UTF_8) {
-			if ( codeChar == pgm_read_byte(utf_8Code+i) )
-				return i;
-		}
-#endif
-
-#ifdef ISO8859_2
-		if (codePage == ISO8859_2) {
-			if ( codeChar == pgm_read_byte(iso8859_2Code+i) )
-				return i;
-		}
-#endif
-
-#ifdef WIN1250
-		if (codePage == WIN1250) {
-			if ( codeChar == pgm_read_byte(win1250Code+i) )
-				return i;
-		}
-#endif
-
-#ifdef CP852
-		if (codePage == CP852) {
-			if ( codeChar == pgm_read_byte(cp852Code+i) )
-				return i;
-		}
-#endif
+	for ( uint8_t i = 0; i < PL_CHARACTERS_COUNT; i++ ) {
+		if ( codeChar == cp852Code[i] )
+			return i;
 	}
 	return tmp;
 }
-/************************************************************/
 
+#endif

@@ -5,7 +5,7 @@
 #include "libs/SW_BOARD/sw_gpio.h"
 #include "libs/SW_BOARD/sw_led_blink_debug.h"
 #include "libs/SW_TIMERS/sw_soft_timers.h"
-#include "libs/SW_STM_PERIPHS/sw_i2c_simple_v2.h"
+#include "libs/SW_STM_PERIPHS/sw_i2c_base_v2.h"
 
 #include "libs/SW_GRAPHICS/SW_SSD1306/framebuffer.h"
 #include "libs/SW_GRAPHICS/displays.h"
@@ -105,29 +105,26 @@ void key1_decoded(void) {
 	if ( keyboard_ptr()->keyEvent == SHORT_PRESS ) {
 //		sw_led_on();
 //		sw_led_start_blinking( 2, 100 );
-		TEXT_display_float( 0, 0,  ++counter1,  	&TextX );
-		sw_ssd1306_display();
+		TEXT_display_float( 0, 0,  ++counter1,  &TextX );
 	} else
 	if ( keyboard_ptr()->keyEvent == MEDIUM_PRESS ) {
-		TEXT_display_float( 0, 16,  ++counter2,  	&TextY );
-		sw_ssd1306_display();
+		TEXT_display_float( 0, 16,  ++counter2, &TextY );
 	} else
 	if ( keyboard_ptr()->keyEvent == DOUBLE_PRESS ) {
-		TEXT_display_float( 0, 32,  ++counter3,  	&TextZ );
-		sw_ssd1306_display();
+		TEXT_display_float( 0, 32,  ++counter3, &TextZ );
 	} else
 	if ( keyboard_ptr()->keyEvent == VLONG_PRESS ) {
 		counter3 = 0; counter2 = 0; counter1 = 0;
-		TEXT_display_float( 0,  0,  counter1,  	&TextX );
-		TEXT_display_float( 0, 16,  counter2,  	&TextY );
-		TEXT_display_float( 0, 32,  counter3,  	&TextZ );
+		TEXT_display_float( 0,  0, counter1,  &TextX );
+		TEXT_display_float( 0, 16, counter2,  &TextY );
+		TEXT_display_float( 0, 32, counter3,  &TextZ );
 		sw_led_start_blinking( 3, 100 );
-		sw_ssd1306_display();
 	} else
 	if ( keyboard_ptr()->keyEvent == KEY_REPEAT ) {
-		TEXT_display_float( 0, 0,  ++counter1,  	&TextX );
-		sw_ssd1306_display();
+		TEXT_display_float( 0, 0,  ++counter1,  &TextX );
 	}
+	TEXT_display_string( 0, 48, (CHAR *)"Simon śćźń", &Temp );
+	sw_ssd1306_display();
 }
 void key2_decoded(void) { sw_led_xor(); }
 
