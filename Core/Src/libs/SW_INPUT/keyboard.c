@@ -7,8 +7,8 @@
 
 #include "sw_mcu_conf.h"
 
-#include "SW_BOARD/sw_gpio.h"
-#include "SW_TIMERS/sw_soft_timers.h"
+#include "../SW_BOARD/sw_gpio.h"
+#include "../SW_TIMERS/sw_soft_timers.h"
 
 
 #include "keyboard.h"
@@ -167,7 +167,6 @@ static KEY_EVENT_t key_pressed( void ) {
 	} else {
 		pressKeyCheck = keyRELEASED;
 	}
-
 	uint8_t slope = analyze_slope( pressKeyCheck, lastState );
 	switch ( slope ) {
 		case stateFALL:

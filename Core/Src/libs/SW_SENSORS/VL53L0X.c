@@ -6,9 +6,9 @@
  */
 
 #include "sw_mcu_conf.h"
-#include "SW_BOARD/sw_gpio.h"
-#include "SW_TIMERS/sw_soft_timers.h"
-#include "SW_STM_PERIPHS/sw_i2c_base_v2.h"
+#include "../SW_BOARD/sw_gpio.h"
+#include "../SW_TIMERS/sw_soft_timers.h"
+#include "../SW_STM_PERIPHS/sw_i2c_base_v2.h"
 
 #include "VL53L0X.h"
 

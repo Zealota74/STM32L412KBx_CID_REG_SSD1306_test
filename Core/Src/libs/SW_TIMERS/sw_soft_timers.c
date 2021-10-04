@@ -11,7 +11,7 @@
 #include "sw_soft_timers.h"
 
 #include "../SW_BOARD/sw_led_blink_debug.h"
-#include "../keyboard.h"
+#include "../SW_INPUT/keyboard.h"
 
 // https://deepbluembedded.com/stm32-delay-microsecond-millisecond-utility-dwt-delay-timer-delay/
 uint32_t DWT_Delay_Init(void) {
@@ -119,8 +119,8 @@ void delay_ms( uint16_t ms ) {
 /*********************************************************/
 
 void delay_us( uint16_t us ) {
-	  uint32_t au32_initial_ticks = DWT->CYCCNT;
-	  uint32_t au32_ticks = ( uint32_t ) SystemCoreClock / 1000000;
-	  us *= au32_ticks;
-	  while ( (DWT->CYCCNT - au32_initial_ticks) < us - au32_ticks );
+	uint32_t au32_initial_ticks = DWT->CYCCNT;
+	uint32_t au32_ticks = ( uint32_t ) SystemCoreClock / 1000000;
+	us *= au32_ticks;
+	while ( (DWT->CYCCNT - au32_initial_ticks) < us - au32_ticks );
 }

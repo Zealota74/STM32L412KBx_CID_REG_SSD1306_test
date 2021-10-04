@@ -8,25 +8,24 @@
 #ifndef LIBS_SW_STM_PERIPHS_SW_SPI_V2_H_
 #define LIBS_SW_STM_PERIPHS_SW_SPI_V2_H_
 
+#include "sw_spi_irq_dma.h"
+
 #define SPI_DMA
 //#define SPI_IRQ
 //
-#define SOFT_NSS				//{ FALSE = hardware pin NSS, TRUE = software pin NSS }
 
+#if defined SPI_DMA || defined SPI_IRQ
+#include "sw_spi_irq_dma.h"
+#endif
+
+#define SOFT_NSS				// { FALSE = hardware pin NSS, TRUE = software pin NSS }
+enum {
+	spi_8bit = 8, spi_12bit = 12, spi_16bit = 16
+};
 
 #ifdef SOFT_NSS
 #	define SOFT_NSS_PORT	PORTA
 #	define SOFT_NSS_PIN		PA2
-#endif
-
-#ifdef SPI_DMA
-#define SPI_DMATX_Channel				DMA1_Channel3
-#define SPI_DMATX_TC_FLAG				DMA_ISR_TCIF3		// Transfer Complete flag
-#define SPI_DMA_ChannelTX_IRQn			DMA1_Channel3_IRQn
-#define SPI_DMA_ChannelTX_IRQHandler	DMA1_Channel3_IRQHandler
-#define SPI_DMA_BUFF_SIZE_TX			128
-typedef int8_t 							spiDMA_status_t;
-typedef uint8_t 						dma_buff_t;
 #endif
 
 typedef struct {
@@ -34,6 +33,7 @@ typedef struct {
 	uint8_t cpol;
 	uint8_t cpha;
 } SPI_param_t;
+
 typedef struct {
 	SPI_TypeDef * 	SPI;
 	T_GPIO_MODE 	alternateFun;
@@ -71,23 +71,17 @@ typedef struct {
 	static const SPI_gpio_t	spi1ALT_nss	= { gpio_mode_AF5_PP_MS, PORTB, PB9  };
 	static const SPI_gpio_t	spi1ALT_sck	= { gpio_mode_AF5_PP_MS, PORTB, PB10 };
 #elif defined STM32L4
-	static const SPI_t spi1 	= { SPI1, gpio_mode_AF5_PP_HS, PORTA, PORTA, PORTA, PORTA, PA4,  PA5,  PA6,  PA7  };
+	static const SPI_t spi1 = { SPI1, gpio_mode_AF5_PP_HS, PORTA, PORTA, PORTA, PORTA, PA4,  PA5,  PA6,  PA7  };
 #endif
 
 
-extern uint8_t		sw_spi_write_read( uint16_t data, uint32_t bitSize );
+extern uint16_t		sw_spi_write_read( uint16_t data, uint32_t bitSize );
 extern void 		sw_spi_hw_init( const SPI_param_t * param );
 extern void 		sw_spi_hw_send_buff( void * buffer, uint8_t buffSize, uint32_t bitSize );
 extern void 		sw_spi_write( uint8_t data, uint32_t bitSize );
 extern uint8_t  	sw_spi_read( uint32_t bitSize );
 extern dma_buff_t * sw_spi_get_buff(void);
 
-//---------------------------------------------------------------------------------
-#ifdef SPI_DMA
-extern void sw_spi_dma_send( uint8_t * buffer, uint8_t buffSize, uint8_t bitSize );
-extern void register_spiDMAended_event_callback( void (*callback)( void ) );
-extern void SW_SPI_DMA_END_EVENT(void);
-#endif
 
 #endif /* LIBS_SW_STM_PERIPHS_SW_SPI__V2_H_ */
 

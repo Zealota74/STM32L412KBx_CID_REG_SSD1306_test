@@ -1,6 +1,6 @@
 #include "sw_mcu_conf.h"
 
-#include "libs/sw_rcc.h"
+#include "libs/SW_STM_PERIPHS/sw_rcc.h"
 
 #include "libs/SW_BOARD/sw_gpio.h"
 #include "libs/SW_BOARD/sw_led_blink_debug.h"
@@ -12,14 +12,13 @@
 #include "libs/SW_GRAPHICS/text.h"
 #include "libs/SW_GRAPHICS/SW_SSD1306/sw_ssd1306_v1.h"
 
-#include "libs/MK_GESTURE_PAJ7620/mk_paj7620.h"
-#include "libs/sw_mpu6050.h"
-#include "libs/sw_ADXL345.h"
-#include "libs/VL53L0X.h"
+#include "libs/SW_SENSORS/sw_mpu6050.h"
+#include "libs/SW_SENSORS/sw_ADXL345.h"
+#include "libs/SW_SENSORS/VL53L0X.h"
 
 
-#include "libs/sw_vcnl4010.h"
-#include "libs/keyboard.h"
+#include "libs/SW_SENSORS/sw_vcnl4010.h"
+#include "libs/SW_INPUT/keyboard.h"
 
 void keyboard(void);
 void SystemClock_Config(void);
@@ -27,7 +26,6 @@ void SystemClock_Config(void);
 void pomiar( T_RESULTS *results );
 uint16_t proximityAverage;
 uint16_t ambilightAverage;
-void my_gesture( TGSNR last_gs, TGSNR second_gs, TGSNR first_gs );
 
 void mpu6050_test_loop(void);
 bool mpu6050_test_init(void);
@@ -246,18 +244,3 @@ void pomiar( T_RESULTS *pomiar1 ) {
 	gpio_pin_XOR( DEBUG_PORT0, DEBUG_PIN0 );
 }
 
-void my_gesture( TGSNR last_gs, TGSNR second_gs, TGSNR first_gs ) {
-//	graphic_fill_screen_RAM( BLACK );
-    																	// numery gestów
-//    if( last_gs 	 == gs_right )      graphic_puts_RAM( 0, 0, L"RIGHT", 1, WHITE, BLACK, CurrentFont );		// 1
-//    else if( last_gs == gs_left )       graphic_puts_RAM( 0, 0, L"LEFT", 1, WHITE, BLACK, CurrentFont );		// 2
-//    else if( last_gs == gs_up )         graphic_puts_RAM( 0, 0, L"UP", 1, WHITE, BLACK, CurrentFont );		// 3
-//    else if( last_gs == gs_down )       graphic_puts_RAM( 0, 0, L"DOWN", 1, WHITE, BLACK, CurrentFont );		// 4
-//    else if( last_gs == gs_forward )    graphic_puts_RAM( 0, 0, L"FORWARD", 1, WHITE, BLACK, CurrentFont );	// 5
-//    else if( last_gs == gs_backward )   graphic_puts_RAM( 0, 0, L"BACKWARD", 1, WHITE, BLACK, CurrentFont );	// 6
-//    else if( last_gs == gs_cw )         graphic_puts_RAM( 0, 0, L"CW", 1, WHITE, BLACK, CurrentFont );		// 7
-//    else if( last_gs == gs_ccw )        graphic_puts_RAM( 0, 0, L"CCW", 1, WHITE, BLACK, CurrentFont );		// 8
-//    else if( last_gs == gs_wave )       graphic_puts_RAM( 0, 0, L"WAVE", 1, WHITE, BLACK, CurrentFont );		// 9
-
-//	sw_ssd1306_ram_to_display(0);
-}
